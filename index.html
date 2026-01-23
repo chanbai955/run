@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Chan's Run</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --neon-green: #32D74B;
+            --accent-blue: #0A84FF;
+            --danger-red: #FF453A;
+            --glass-bg: rgba(28, 28, 30, 0.95);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Adjusted Header Styling */
+        .header { 
+            padding: 25px 20px 10px 20px;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+
+        .header-info { display: flex; flex-direction: column; min-width: 95px; }
+        #fullDate { color: #fff; font-size: 0.9rem; font-weight: 700; letter-spacing: 0.5px; }
+        #liveClock { color: #888; font-size: 0.75rem; margin-top: 2px; }
+
+        .title-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* Left-aligned text */
+            justify-content: center;
+            padding-left: 30px; /* Shifted to the right */
+        }
+
+        .app-title {
+            color: var(--neon-green);
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin: 0;
+        }
+
+        .app-subtitle {
+            color: #fff;
+            font-size: 0.55rem;
+            font-weight: 400;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-family: 'Courier New', Courier, monospace;
+            margin-top: 2px;
+            opacity: 0.7;
+        }
+
+        /* Main Stats Display */
+        .main-display { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 0 25px;
+        }
+
+        .main-stat {
+            font-size: clamp(5.5rem, 20vw, 7.5rem); 
+            font-weight: 900; 
+            margin: 0;
+            background: linear-gradient(180deg, #fff 50%, var(--neon-green));
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent;
+            line-height: 0.9;
+        }
+
+        .label { font-size: 0.95rem; color: #444; letter-spacing: 5px; margin-top: 10px; font-weight: 800; }
+
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            width: 100%; 
+            margin-top: 40px; 
+            border-top: 1px solid #1c1c1e;
+            padding-top: 25px;
+        }
+        .stat-box h2 { margin: 0; font-size: 2.1rem; font-weight: 700; color: #fff; }
+        .stat-box p { margin: 5px 0 0; color: #555; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;}
+
+        /* Bottom Controls Bar */
+        .controls-bar {
+            background: #121212;
+            padding: 20px 20px 140px 20px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-top: 1px solid #1c1c1e;
+            border-radius: 45px 45px 0 0;
+            box-shadow: 0 -15px 40px rgba(0,0,0,0.6);
+        }
+
+        .goal-container { width: 90%; margin-bottom: 20px; cursor: pointer; }
+        .goal-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: #888; margin-bottom: 8px; font-weight: bold; }
+        .goal-header span b { color: #fff; }
+        
+        .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; box-shadow: 0 0 15px rgba(50, 215, 75, 0.4); }
+        
+        #dueDateDisplay { font-size: 0.7rem; color: #555; margin-top: 8px; text-align: center; display: block; font-weight: 600; }
+
+        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+
+        .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.1s ease; }
+        .btn:active { transform: scale(0.85); }
+
+        .btn-main { width: 85px; height: 85px; }
+        .btn-side { width: 55px; height: 55px; background: #2c2c2e; color: #fff; }
+        .reset-btn { background: #333; color: #fff !important; width: 45px; height: 45px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .start { background: var(--neon-green); color: #000; }
+        .pause { background: #fff; color: #000; }
+        .stop { background: var(--danger-red); color: #fff; }
+        .hidden { display: none !important; }
+
+        /* Compact Centered Modal */
+        #goalModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9); z-index: 2000;
+            display: none; justify-content: center; align-items: center; padding: 20px;
+        }
+
+        .modal-card {
+            background: #1c1c1e; width: 100%; max-width: 320px;
+            padding: 25px; border-radius: 25px; border: 1px solid #333;
+            text-align: center;
+        }
+
+        .modal-card h2 { margin: 0 0 20px 0; font-size: 1.4rem; color: #fff; }
+
+        .input-group { text-align: left; margin-bottom: 15px; }
+        .input-group label { display: block; color: #888; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; }
+        .input-group input { 
+            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; 
+            background: #000; color: #fff; font-size: 1rem; outline: none; box-sizing: border-box; 
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+        .modal-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+
+        /* Fullscreen History Modal */
+        #historyModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 1000;
+            display: none; flex-direction: column; padding: 50px 25px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-info">
+            <span id="fullDate">--/--/----</span>
+            <span id="liveClock">00:00:00</span>
+        </div>
+
+        <div class="title-container">
+            <div class="app-title">Chanthiran</div>
+            <div class="app-subtitle">RUN TRACKER</div>
+        </div>
+
+        <button id="resetBtn" class="btn reset-btn">
+            <span class="material-icons-round" style="font-size: 28px;">refresh</span>
+        </button>
+    </div>
+    
+    <div class="main-display">
+        <p class="main-stat" id="distance">0.00</p>
+        <p class="label">KILOMETERS</p>
+
+        <div class="stats-grid">
+            <div class="stat-box" style="text-align: left;"><h2 id="timer">00:00</h2><p>TIME</p></div>
+            <div class="stat-box" style="text-align: right;"><h2 id="pace">0'00"</h2><p>PACE/KM</p></div>
+        </div>
+    </div>
+
+    <div class="controls-bar">
+        <div class="goal-container" id="goalTrigger">
+            <div class="goal-header">
+                <span>DONE: <b id="doneKm">0.00</b> KM</span>
+                <span>BAL: <b id="balKm">0.00</b> KM</span>
+            </div>
+            <div class="progress-bg">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+            <span id="dueDateDisplay">TARGET: NOT SET (TAP TO SET)</span>
+        </div>
+
+        <div class="button-row">
+            <button id="openHistory" class="btn btn-side" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
+            <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
+            <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
+            <button id="saveDbBtn" class="btn btn-side hidden" style="color:var(--neon-green);"><span class="material-icons-round">cloud_upload</span></button>
+            <button id="pdfBtn" class="btn btn-side hidden" style="color: #5E5CE6;"><span class="material-icons-round">picture_as_pdf</span></button>
+        </div>
+    </div>
+
+    <div id="goalModal">
+        <div class="modal-card">
+            <h2>SET TARGET</h2>
+            <div class="input-group">
+                <label>TARGET DISTANCE (KM)</label>
+                <input type="number" id="goalInput" step="0.1" placeholder="e.g. 10.0">
+            </div>
+            <div class="input-group">
+                <label>DUE DATE</label>
+                <input type="date" id="dateInput">
+            </div>
+            <div class="modal-actions">
+                <button id="saveGoal" class="btn start" style="width:100%; padding:14px; border-radius:12px; font-weight:800;">SET GOAL</button>
+                <button id="closeGoal" class="btn" style="background:none; color:#666; font-size:0.85rem; font-weight:bold;">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+            <h1 style="margin:0; font-size: 1.8rem;">LAP HISTORY</h1>
+            <button id="closeHistory" class="btn" style="background:transparent; color:#fff;"><span class="material-icons-round" style="font-size: 2.5rem;">close</span></button>
+        </div>
+        <div id="lapList" style="overflow-y: auto; flex: 1;"></div>
+    </div>
+
+<script>
+    let watchID, timerInterval, totalDistance = 0, totalSeconds = 0, lastCoords = null;
+    let targetGoal = 0, lastFullKm = 0, lapData = [];
+    const { jsPDF } = window.jspdf;
+
+    let db;
+    const dbReq = indexedDB.open("RunProEliteDB", 1);
+    dbReq.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
+    };
+    dbReq.onsuccess = (e) => db = e.target.result;
+
+    function getBritishDate(dateObj) {
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        return `${d}/${m}/${dateObj.getFullYear()}`;
+    }
+
+    setInterval(() => {
+        document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0];
+    }, 1000);
+
+    const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'),
+          paceEl = document.getElementById('pace'), startBtn = document.getElementById('startBtn'),
+          stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
+          saveDbBtn = document.getElementById('saveDbBtn'), progressBar = document.getElementById('progressBar'),
+          doneKm = document.getElementById('doneKm'), balKm = document.getElementById('balKm'),
+          dueDateDisplay = document.getElementById('dueDateDisplay');
+
+    document.getElementById('fullDate').innerText = getBritishDate(new Date());
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+
+    function updateProgress() {
+        doneKm.innerText = totalDistance.toFixed(2);
+        if (targetGoal > 0) {
+            let balance = Math.max(targetGoal - totalDistance, 0);
+            balKm.innerText = balance.toFixed(2);
+            let percentage = Math.min((totalDistance / targetGoal) * 100, 100);
+            progressBar.style.width = percentage + "%";
+            if (percentage >= 100) progressBar.style.background = "var(--accent-blue)";
+        }
+    }
+
+    document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
+    
+    document.getElementById('saveGoal').onclick = () => {
+        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
+        let dateVal = document.getElementById('dateInput').value;
+        if (targetGoal > 0) {
+            let formattedDue = dateVal ? dateVal.split('-').reverse().join('/') : "N/A";
+            dueDateDisplay.innerText = `TARGET: ${targetGoal} KM | DUE: ${formattedDue}`;
+            updateProgress();
+            document.getElementById('goalModal').style.display = 'none';
+            speak(`Goal set to ${targetGoal} kilometers.`);
+        }
+    };
+
+    function start() {
+        lastCoords = null;
+        speak("Starting run.");
+        timerInterval = setInterval(() => {
+            totalSeconds++;
+            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
+            if(totalDistance > 0) {
+                const totalMin = (totalSeconds / 60) / totalDistance;
+                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+            }
+        }, 1000);
+
+        watchID = navigator.geolocation.watchPosition(pos => {
+            if (pos.coords.accuracy > 45) return;
+            if (lastCoords) {
+                const R = 6371;
+                const dLat = (pos.coords.latitude-lastCoords.lat)*Math.PI/180;
+                const dLon = (pos.coords.longitude-lastCoords.lon)*Math.PI/180;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
+                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                if (d > 0.002) { 
+                    totalDistance += d; 
+                    distEl.innerText = totalDistance.toFixed(2); 
+                    updateProgress();
+                    if (Math.floor(totalDistance) > lastFullKm) {
+                        lastFullKm = Math.floor(totalDistance);
+                        lapData.push({km: lastFullKm, pace: paceEl.innerText});
+                        const row = document.createElement('div');
+                        row.style.cssText = "display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid #1c1c1e;";
+                        row.innerHTML = `<span style="color:var(--neon-green); font-weight:bold;">KM ${lastFullKm}</span><span>${paceEl.innerText}</span>`;
+                        document.getElementById('lapList').prepend(row);
+                        speak(`${lastFullKm} kilometers reached.`);
+                    }
+                }
+            }
+            lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
+        }, null, {enableHighAccuracy:true});
+        setUI('running');
+    }
+
+    function setUI(state) {
+        if (state === 'running') {
+            document.getElementById('startIcon').innerText = 'pause'; startBtn.className = 'btn btn-main pause';
+            stopBtn.classList.add('hidden'); pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden');
+        } else if (state === 'paused') {
+            document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
+            stopBtn.classList.remove('hidden');
+        } else if (state === 'stopped') {
+            startBtn.classList.add('hidden'); stopBtn.classList.add('hidden');
+            pdfBtn.classList.remove('hidden'); saveDbBtn.classList.remove('hidden');
+        }
+    }
+
+    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
+    stopBtn.onclick = () => { speak("Workout finished."); setUI('stopped'); };
+    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
+    document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+
+    saveDbBtn.onclick = () => {
+        const tx = db.transaction(["runs"], "readwrite");
+        tx.objectStore("runs").add({
+            date: document.getElementById('fullDate').innerText,
+            distance: totalDistance.toFixed(2),
+            pace: paceEl.innerText,
+            duration: timerEl.innerText
+        });
+        alert("Session saved to History!");
+    };
+
+    pdfBtn.onclick = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(22); doc.setTextColor(50, 215, 75);
+        doc.text("CHANTHIRAN PERFORMANCE LOG", 20, 30);
+        doc.setFontSize(12); doc.setTextColor(0, 0, 0);
+        doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 45);
+        doc.text(`FINISH TIME: ${document.getElementById('liveClock').innerText}`, 20, 52);
+        doc.text(`TOTAL DISTANCE: ${totalDistance.toFixed(2)} KM`, 20, 65);
+        doc.text(`AVG PACE: ${paceEl.innerText} /KM`, 20, 75);
+        doc.save(`Run_Report_${Date.now()}.pdf`);
+    };
+</script>
+</body>
+</html>
