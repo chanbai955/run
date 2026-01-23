@@ -26,7 +26,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Adjusted Header Styling */
         .header { 
             padding: 25px 20px 10px 20px;
             display: flex; 
@@ -42,9 +41,9 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: flex-start; /* Left-aligned text */
+            align-items: flex-start;
             justify-content: center;
-            padding-left: 30px; /* Shifted to the right */
+            padding-left: 30px;
         }
 
         .app-title {
@@ -67,7 +66,6 @@
             opacity: 0.7;
         }
 
-        /* Main Stats Display */
         .main-display { 
             flex: 1; 
             display: flex; 
@@ -100,7 +98,6 @@
         .stat-box h2 { margin: 0; font-size: 2.1rem; font-weight: 700; color: #fff; }
         .stat-box p { margin: 5px 0 0; color: #555; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;}
 
-        /* Bottom Controls Bar */
         .controls-bar {
             background: #121212;
             padding: 20px 20px 140px 20px; 
@@ -135,7 +132,6 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* Compact Centered Modal */
         #goalModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.9); z-index: 2000;
@@ -149,7 +145,6 @@
         }
 
         .modal-card h2 { margin: 0 0 20px 0; font-size: 1.4rem; color: #fff; }
-
         .input-group { text-align: left; margin-bottom: 15px; }
         .input-group label { display: block; color: #888; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; }
         .input-group input { 
@@ -160,7 +155,6 @@
 
         .modal-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
 
-        /* Fullscreen History Modal */
         #historyModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 1000;
@@ -309,24 +303,35 @@
     function start() {
         lastCoords = null;
         speak("Starting run.");
+        
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(totalDistance > 0) {
+            
+            // Pace fix: Only calculate if we've moved at least 5 meters to avoid huge numbers
+            if(totalDistance > 0.005) {
                 const totalMin = (totalSeconds / 60) / totalDistance;
-                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                if (totalMin < 30) { // Sane cap for pace
+                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                }
+            } else {
+                paceEl.innerText = `0'00"`;
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            if (pos.coords.accuracy > 45) return;
+            // Distance fix: Loosened accuracy to 60m for real-world usage
+            if (pos.coords.accuracy > 60) return;
+
             if (lastCoords) {
                 const R = 6371;
                 const dLat = (pos.coords.latitude-lastCoords.lat)*Math.PI/180;
                 const dLon = (pos.coords.longitude-lastCoords.lon)*Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                if (d > 0.002) { 
+                
+                // Distance fix: Lowered movement threshold to 1 meter (0.001)
+                if (d > 0.001) { 
                     totalDistance += d; 
                     distEl.innerText = totalDistance.toFixed(2); 
                     updateProgress();
@@ -342,7 +347,13 @@
                 }
             }
             lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-        }, null, {enableHighAccuracy:true});
+        }, (err) => {
+            console.error("GPS Error:", err);
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000
+        });
         setUI('running');
     }
 
@@ -359,8 +370,24 @@
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
-    stopBtn.onclick = () => { speak("Workout finished."); setUI('stopped'); };
+    startBtn.onclick = () => { 
+        if (!watchID) start(); 
+        else { 
+            clearInterval(timerInterval); 
+            navigator.geolocation.clearWatch(watchID); 
+            watchID = null; 
+            setUI('paused'); 
+        } 
+    };
+
+    stopBtn.onclick = () => { 
+        clearInterval(timerInterval); 
+        if(watchID) navigator.geolocation.clearWatch(watchID); 
+        watchID = null; 
+        speak("Workout finished."); 
+        setUI('stopped'); 
+    };
+
     document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
     document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
