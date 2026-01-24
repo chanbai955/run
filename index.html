@@ -11,7 +11,7 @@
             --neon-green: #32D74B;
             --accent-blue: #0A84FF;
             --danger-red: #FF453A;
-            --glass-bg: rgba(28, 28, 30, 0.95);
+            --warning-yellow: #FFCC00;
         }
 
         body {
@@ -34,20 +34,8 @@
         }
 
         .header-info { display: flex; flex-direction: column; min-width: 100px; }
-        #fullDate { 
-            color: #ffffff; 
-            font-size: 1.1rem; 
-            font-weight: 900; 
-            letter-spacing: 0.5px;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-        }
-        #liveClock { 
-            color: #ffffff; 
-            font-size: 1rem; 
-            margin-top: 5px; 
-            font-weight: 800;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
-        }
+        #fullDate { color: #ffffff; font-size: 1.1rem; font-weight: 900; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
+        #liveClock { color: #ffffff; font-size: 1rem; margin-top: 5px; font-weight: 800; text-shadow: 0 0 8px rgba(255, 255, 255, 0.4); }
 
         .title-container {
             flex: 1;
@@ -63,24 +51,47 @@
 
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
         
-        /* Signal Bar Styling */
-        .signal-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.7rem; font-weight: 800; color: #555; }
-        .signal-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; }
-        .signal-good { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
-        .signal-poor { background: #E6B400; }
-        .signal-none { background: var(--danger-red); }
+        /* CENTERED WRAPPER */
+        .stat-wrapper { display: flex; flex-direction: column; align-items: center; text-align: center; }
 
         .main-stat {
-            font-size: clamp(5.5rem, 20vw, 7.5rem); 
+            font-size: clamp(6.5rem, 25vw, 8.5rem); 
             font-weight: 900; 
             margin: 0;
-            background: linear-gradient(180deg, #fff 50%, var(--neon-green));
+            background: linear-gradient(180deg, #fff 40%, var(--neon-green));
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent;
-            line-height: 0.9;
+            line-height: 0.8;
+            filter: drop-shadow(0 0 10px rgba(50, 215, 75, 0.2));
         }
 
-        .label { font-size: 0.95rem; color: #444; letter-spacing: 5px; margin-top: 10px; font-weight: 800; }
+        /* CENTERED ICON AND LABEL BENEATH ZEROS */
+        .label-row { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            gap: 15px; 
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .label { 
+            font-size: 1.1rem; 
+            color: #666; 
+            letter-spacing: 6px; 
+            font-weight: 900; 
+            margin: 0;
+        }
+
+        #gpsIcon { 
+            font-size: 32px; 
+            transition: all 0.3s ease; 
+            color: #333; 
+        }
+        
+        .sig-good { color: var(--accent-blue) !important; filter: drop-shadow(0 0 15px var(--accent-blue)); }
+        .sig-poor { color: var(--warning-yellow) !important; filter: drop-shadow(0 0 10px var(--warning-yellow)); }
+        .sig-none { color: var(--danger-red) !important; filter: drop-shadow(0 0 10px var(--danger-red)); }
 
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 40px; border-top: 1px solid #1c1c1e; padding-top: 25px; }
         .stat-box h2 { margin: 0; font-size: 2.1rem; font-weight: 800; color: #ffffff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
@@ -94,18 +105,15 @@
             align-items: center;
             border-top: 1px solid #1c1c1e;
             border-radius: 45px 45px 0 0;
-            box-shadow: 0 -15px 40px rgba(0,0,0,0.6);
         }
 
         .goal-container { width: 90%; margin-bottom: 20px; cursor: pointer; }
         .goal-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: #888; margin-bottom: 8px; font-weight: bold; }
-        .goal-header span b { color: #fff; }
-        
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; }
         
-        #dueDateDisplay { font-size: 0.7rem; color: #555; margin-top: 8px; text-align: center; display: block; font-weight: 600; }
-        #daysLeftDisplay { font-size: 0.65rem; color: var(--accent-blue); margin-top: 4px; text-align: center; display: block; font-weight: 800; text-transform: uppercase; }
+        #dueDateDisplay { font-size: 0.75rem; color: #777; margin-top: 10px; text-align: center; display: block; font-weight: 700; }
+        #daysLeftDisplay { font-size: 0.7rem; color: var(--accent-blue); margin-top: 5px; text-align: center; display: block; font-weight: 900; text-transform: uppercase; }
 
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.1s ease; }
@@ -118,17 +126,11 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        #goalModal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.9); z-index: 2000;
-            display: none; justify-content: center; align-items: center; padding: 20px;
-        }
-
+        #goalModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 2000; display: none; justify-content: center; align-items: center; padding: 20px; }
         .modal-card { background: #1c1c1e; width: 100%; max-width: 320px; padding: 25px; border-radius: 25px; border: 1px solid #333; text-align: center; }
         .input-group { text-align: left; margin-bottom: 15px; }
         .input-group label { display: block; color: #888; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px; }
         .input-group input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #000; color: #fff; font-size: 1rem; outline: none; box-sizing: border-box; }
-
         #historyModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: none; flex-direction: column; padding: 50px 25px; }
     </style>
 </head>
@@ -147,12 +149,14 @@
     </div>
     
     <div class="main-display">
-        <div class="signal-wrapper">
-            <div id="signalDot" class="signal-dot"></div>
-            <span id="signalText">GPS SIGNAL: SEARCHING</span>
+        <div class="stat-wrapper">
+            <p class="main-stat" id="distance">0.00</p>
+            <div class="label-row">
+                <p class="label">KILOMETERS</p>
+                <span id="gpsIcon" class="material-icons-round">gps_fixed</span>
+            </div>
         </div>
-        <p class="main-stat" id="distance">0.00</p>
-        <p class="label">KILOMETERS</p>
+        
         <div class="stats-grid">
             <div class="stat-box" style="text-align: left;"><h2 id="timer">00:00</h2><p>TIME</p></div>
             <div class="stat-box" style="text-align: right;"><h2 id="pace">0'00"</h2><p>PACE/KM</p></div>
@@ -175,34 +179,8 @@
             <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
             <button id="saveDbBtn" class="btn btn-side hidden" style="color:var(--neon-green);"><span class="material-icons-round">cloud_upload</span></button>
-            <button id="pdfBtn" class="btn btn-side hidden" style="color: #5E5CE6;"><span class="material-icons-round">picture_as_pdf</span></button>
+            <button id="pdfBtn" class="btn btn-side hidden" style="color: #6e6cf1;"><span class="material-icons-round">picture_as_pdf</span></button>
         </div>
-    </div>
-
-    <div id="goalModal">
-        <div class="modal-card">
-            <h2>SET TARGET</h2>
-            <div class="input-group">
-                <label>TARGET DISTANCE (KM)</label>
-                <input type="number" id="goalInput" step="0.1" placeholder="e.g. 10.0">
-            </div>
-            <div class="input-group">
-                <label>DUE DATE</label>
-                <input type="date" id="dateInput">
-            </div>
-            <div class="modal-actions">
-                <button id="saveGoal" class="btn start" style="width:100%; padding:14px; border-radius:12px; font-weight:800;">SET GOAL</button>
-                <button id="closeGoal" class="btn" style="background:none; color:#666; font-size:0.85rem; font-weight:bold;">CANCEL</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="historyModal">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-            <h1 style="margin:0; font-size: 1.8rem;">LAP HISTORY</h1>
-            <button id="closeHistory" class="btn" style="background:transparent; color:#fff;"><span class="material-icons-round" style="font-size: 2.5rem;">close</span></button>
-        </div>
-        <div id="lapList" style="overflow-y: auto; flex: 1;"></div>
     </div>
 
 <script>
@@ -212,23 +190,19 @@
 
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
     let lastFullKm = Math.floor(totalDistance);
-    const { jsPDF } = window.jspdf;
 
     const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'),
           paceEl = document.getElementById('pace'), startBtn = document.getElementById('startBtn'),
-          stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
-          saveDbBtn = document.getElementById('saveDbBtn'), openHistory = document.getElementById('openHistory'),
-          progressBar = document.getElementById('progressBar'), doneKm = document.getElementById('doneKm'), 
-          balKm = document.getElementById('balKm'), dueDateDisplay = document.getElementById('dueDateDisplay'),
-          daysLeftDisplay = document.getElementById('daysLeftDisplay'), signalDot = document.getElementById('signalDot'),
-          signalText = document.getElementById('signalText');
+          stopBtn = document.getElementById('stopBtn'), progressBar = document.getElementById('progressBar'), 
+          doneKm = document.getElementById('doneKm'), balKm = document.getElementById('balKm'), 
+          dueDateDisplay = document.getElementById('dueDateDisplay'),
+          daysLeftDisplay = document.getElementById('daysLeftDisplay'), gpsIcon = document.getElementById('gpsIcon');
 
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
 
     window.addEventListener('DOMContentLoaded', () => { updateProgress(); checkStatus(); });
 
-    // RESTORED VOICE FUNCTION
     function speak(text) {
         window.speechSynthesis.cancel();
         let utterance = new SpeechSynthesisUtterance(text);
@@ -266,17 +240,11 @@
         }
     }
 
-    function updateSignalStatus(accuracy) {
-        if (accuracy < 30) {
-            signalDot.className = "signal-dot signal-good";
-            signalText.innerText = "GPS SIGNAL: STRONG";
-        } else if (accuracy < 80) {
-            signalDot.className = "signal-dot signal-poor";
-            signalText.innerText = "GPS SIGNAL: POOR";
-        } else {
-            signalDot.className = "signal-dot signal-none";
-            signalText.innerText = "GPS SIGNAL: WEAK";
-        }
+    function updateGpsIcon(accuracy) {
+        gpsIcon.classList.remove('sig-good', 'sig-poor', 'sig-none');
+        if (accuracy < 30) gpsIcon.classList.add('sig-good');
+        else if (accuracy < 80) gpsIcon.classList.add('sig-poor');
+        else gpsIcon.classList.add('sig-none');
     }
 
     function start() {
@@ -292,7 +260,7 @@
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            updateSignalStatus(pos.coords.accuracy);
+            updateGpsIcon(pos.coords.accuracy);
             if (pos.coords.accuracy > 80) return; 
 
             if (lastCoords) {
@@ -305,18 +273,15 @@
                 if (d > 0.001) { 
                     sessionDistance += d; 
                     updateProgress();
-                    
-                    let currentTotal = totalDistance + sessionDistance;
-                    if (Math.floor(currentTotal) > lastFullKm) {
-                        lastFullKm = Math.floor(currentTotal);
+                    if (Math.floor(totalDistance + sessionDistance) > lastFullKm) {
+                        lastFullKm = Math.floor(totalDistance + sessionDistance);
                         speak(`${lastFullKm} kilometers reached.`);
                     }
                 }
             }
             lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
         }, err => {
-            signalDot.className = "signal-dot signal-none";
-            signalText.innerText = "GPS ERROR: " + err.message;
+            gpsIcon.classList.add('sig-none');
         }, {enableHighAccuracy:true, maximumAge:0, timeout: 5000});
         setUI('running');
     }
@@ -324,55 +289,26 @@
     function setUI(state) {
         if (state === 'running') {
             document.getElementById('startIcon').innerText = 'pause'; startBtn.className = 'btn btn-main pause';
-            stopBtn.classList.add('hidden'); pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden'); openHistory.classList.add('hidden');
+            stopBtn.classList.add('hidden');
         } else if (state === 'paused') {
             document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
-            stopBtn.classList.remove('hidden'); openHistory.classList.remove('hidden');
+            stopBtn.classList.remove('hidden');
         } else if (state === 'stopped') {
             startBtn.classList.add('hidden'); stopBtn.classList.add('hidden');
-            pdfBtn.classList.remove('hidden'); saveDbBtn.classList.remove('hidden'); openHistory.classList.remove('hidden');
+            document.getElementById('pdfBtn').classList.remove('hidden'); 
+            document.getElementById('saveDbBtn').classList.remove('hidden');
         } else if (state === 'reset') {
             document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
             startBtn.classList.remove('hidden'); stopBtn.classList.add('hidden');
-            pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden'); openHistory.classList.remove('hidden');
+            document.getElementById('pdfBtn').classList.add('hidden'); 
+            document.getElementById('saveDbBtn').classList.add('hidden');
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); speak("Workout paused."); } };
-    
-    stopBtn.onclick = () => { 
-        totalDistance += sessionDistance;
-        localStorage.setItem('chan_accumulated_km', totalDistance);
-        speak("Workout finished and saved."); 
-        setUI('stopped'); 
-    };
-
-    document.getElementById('resetBtn').onclick = () => { 
-        if(confirm("Reset run?")) {
-            clearInterval(timerInterval);
-            if(watchID) navigator.geolocation.clearWatch(watchID);
-            watchID = null; sessionDistance = 0; totalSeconds = 0;
-            distEl.innerText = "0.00"; timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
-            setUI('reset'); updateProgress();
-        }
-    };
-    
-    document.getElementById('saveGoal').onclick = () => {
-        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
-        targetDate = document.getElementById('dateInput').value;
-        localStorage.setItem('chan_target_km', targetGoal);
-        localStorage.setItem('chan_target_date', targetDate);
-        if (targetGoal > 0) {
-            updateProgress(); checkStatus();
-            document.getElementById('goalModal').style.display = 'none';
-            speak("Goal set.");
-        }
-    };
-
-    document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
-    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); speak("Paused."); } };
+    stopBtn.onclick = () => { totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance); setUI('stopped'); speak("Workout saved."); };
+    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) { location.reload(); } };
     document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
-    document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
 </script>
 </body>
 </html>
