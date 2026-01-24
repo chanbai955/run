@@ -47,6 +47,7 @@
             filter: drop-shadow(0 0 15px rgba(50, 215, 75, 0.3));
         }
 
+        /* CENTERED KM TEXT AND GPS ICON TO THE RIGHT */
         .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 15px; width: 100%; }
         .label { font-size: 1.1rem; color: #666; letter-spacing: 6px; font-weight: 900; margin: 0; }
         #gpsIcon { font-size: 32px; transition: all 0.3s ease; color: #333; }
@@ -66,29 +67,24 @@
         
         .location-section { width: 90%; display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
         .loc-group { display: flex; align-items: center; gap: 10px; }
-        .loc-icon { font-size: 22px; cursor: pointer; transition: 0.2s; }
+        .loc-icon { font-size: 22px; cursor: pointer; }
         #locDisplay { font-size: 0.8rem; font-weight: 900; color: var(--accent-blue); text-transform: uppercase; }
 
         #dueDateDisplay { font-size: 0.75rem; color: #777; margin-top: 5px; text-align: center; font-weight: 700; }
         #daysLeftDisplay { font-size: 0.7rem; color: var(--accent-blue); margin-top: 5px; text-align: center; font-weight: 900; }
 
+        /* BUTTON ROW - PDF RESTORED TO SAME LINE */
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.1s ease; }
         .btn-main { width: 85px; height: 85px; }
         .btn-side { width: 55px; height: 55px; background: #2c2c2e; color: #fff; }
         .reset-btn { background: #333; color: #fff !important; width: 45px; height: 45px; }
-
         .start { background: var(--neon-green); color: #000; }
-        .pause { background: #fff; color: #000; }
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
-        .quick-note { 
-            background: var(--card-bg); width: 100%; max-width: 500px; border-radius: 30px 30px 0 0; 
-            padding: 25px; max-height: 85vh; overflow-y: auto; box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
-            animation: slideUp 0.3s ease-out; position: relative;
-        }
+        .quick-note { background: var(--card-bg); width: 100%; max-width: 500px; border-radius: 30px 30px 0 0; padding: 25px; max-height: 85vh; overflow-y: auto; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out; position: relative; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; position: sticky; top: 0; background: var(--card-bg); z-index: 10; }
         .note-header h2 { margin: 0; font-size: 1.2rem; color: var(--neon-green); letter-spacing: 1px; }
@@ -256,24 +252,43 @@
     }
 
     function setUI(state) {
-        startBtn.classList.toggle('hidden', state === 'stopped' || state === 'running');
-        stopBtn.classList.toggle('hidden', state !== 'running');
-        saveDbBtn.classList.toggle('hidden', state !== 'stopped');
-        pdfBtn.classList.toggle('hidden', state !== 'stopped');
-        if(state === 'running') document.getElementById('startIcon').innerText = 'pause';
+        if(state === 'running') {
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            saveDbBtn.classList.add('hidden');
+            pdfBtn.classList.add('hidden');
+            document.getElementById('startIcon').innerText = 'pause';
+        } else if (state === 'paused') {
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.remove('hidden');
+            saveDbBtn.classList.add('hidden');
+            pdfBtn.classList.add('hidden');
+            document.getElementById('startIcon').innerText = 'play_arrow';
+        } else if (state === 'stopped') {
+            startBtn.classList.add('hidden');
+            stopBtn.classList.add('hidden');
+            saveDbBtn.classList.remove('hidden');
+            pdfBtn.classList.remove('hidden');
+        }
     }
 
     startBtn.onclick = () => { 
         if (!watchID) start(); 
         else { 
-            clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); speak("Paused."); 
-            // FIXED: AUTO SAVE DIRECT
-            generatePDF();
+            clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; 
+            setUI('paused'); speak("Paused."); 
         } 
     };
     
-    stopBtn.onclick = () => { totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance); setUI('stopped'); speak("Saved."); };
-    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
+    stopBtn.onclick = () => { 
+        clearInterval(timerInterval);
+        if(watchID) navigator.geolocation.clearWatch(watchID);
+        watchID = null;
+        totalDistance += sessionDistance;
+        localStorage.setItem('chan_accumulated_km', totalDistance);
+        setUI('stopped');
+        speak("Stopped.");
+    };
 
     saveDbBtn.onclick = () => {
         const tx = db.transaction(["runs"], "readwrite");
@@ -282,17 +297,20 @@
             distance: sessionDistance.toFixed(2), 
             pace: paceEl.innerText, 
             duration: timerEl.innerText, 
-            location: runLocation // FIXED: Captures exact current location name
+            location: runLocation
         });
-        alert("Saved to Notes!");
+        alert("Run Notes Updated!");
     };
+
+    pdfBtn.onclick = generatePDF;
+
+    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
 
     openHistory.onclick = () => {
         document.getElementById('historyModal').style.display = 'flex';
         const req = db.transaction("runs", "readonly").objectStore("runs").getAll();
         req.onsuccess = () => {
             const list = document.getElementById('lapList'); list.innerHTML = "";
-            if (req.result.length === 0) list.innerHTML = "<p style='color:#666; text-align:center;'>No records found.</p>";
             req.result.reverse().forEach(run => {
                 const row = document.createElement('div');
                 row.className = "history-item";
@@ -317,8 +335,6 @@
         dueDateDisplay.innerText = `TARGET: ${targetGoal} KM | DUE: ${targetDate.split('-').reverse().join('/')}`;
         daysLeftDisplay.innerText = diffDays < 0 ? "OVERDUE!" : `${diffDays} DAYS TO GO`;
     }
-
-    pdfBtn.onclick = generatePDF;
 </script>
 </body>
 </html>
