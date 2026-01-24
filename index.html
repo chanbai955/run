@@ -117,6 +117,7 @@
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; box-shadow: 0 0 15px rgba(50, 215, 75, 0.4); }
         
         #dueDateDisplay { font-size: 0.7rem; color: #555; margin-top: 8px; text-align: center; display: block; font-weight: 600; }
+        #daysLeftDisplay { font-size: 0.65rem; color: var(--accent-blue); margin-top: 4px; text-align: center; display: block; font-weight: 800; text-transform: uppercase; }
 
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
 
@@ -200,6 +201,7 @@
                 <div class="progress-fill" id="progressBar"></div>
             </div>
             <span id="dueDateDisplay">TARGET: NOT SET (TAP TO SET)</span>
+            <span id="daysLeftDisplay"></span>
         </div>
 
         <div class="button-row">
@@ -238,8 +240,12 @@
     </div>
 
 <script>
-    let watchID, timerInterval, totalDistance = 0, totalSeconds = 0, lastCoords = null;
-    let targetGoal = 0, lastFullKm = 0, lapData = [];
+    let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
+    let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
+    let targetDate = localStorage.getItem('chan_target_date') || "";
+
+    let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
+    let lastFullKm = Math.floor(totalDistance), lapData = [];
     const { jsPDF } = window.jspdf;
 
     let db;
@@ -265,23 +271,68 @@
           stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
           saveDbBtn = document.getElementById('saveDbBtn'), progressBar = document.getElementById('progressBar'),
           doneKm = document.getElementById('doneKm'), balKm = document.getElementById('balKm'),
-          dueDateDisplay = document.getElementById('dueDateDisplay');
+          dueDateDisplay = document.getElementById('dueDateDisplay'),
+          daysLeftDisplay = document.getElementById('daysLeftDisplay');
 
     document.getElementById('fullDate').innerText = getBritishDate(new Date());
+
+    window.addEventListener('DOMContentLoaded', () => {
+        updateProgress();
+        if (targetGoal > 0) {
+            const formattedDate = targetDate.split('-').reverse().join('/');
+            dueDateDisplay.innerText = `TARGET: ${targetGoal} KM | DUE: ${formattedDate}`;
+            checkStatus();
+        }
+    });
 
     function speak(text) {
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
     }
 
+    function checkStatus() {
+        if (!targetDate || targetGoal <= 0) return;
+        
+        const today = new Date().setHours(0,0,0,0);
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const currentTotal = totalDistance + sessionDistance;
+
+        // Check if goal achieved
+        if (currentTotal >= targetGoal) {
+            daysLeftDisplay.innerText = "GOAL ACHIEVED! WELL DONE!";
+            daysLeftDisplay.style.color = "var(--neon-green)";
+            dueDateDisplay.style.color = "var(--neon-green)";
+            return;
+        }
+
+        // Check for Overdue
+        if (diffDays < 0) {
+            dueDateDisplay.innerHTML = `<span style="color:var(--danger-red)">OVERDUE!</span> TARGET: ${targetGoal} KM | DUE: ${targetDate.split('-').reverse().join('/')}`;
+            daysLeftDisplay.innerText = `${Math.abs(diffDays)} DAYS PAST DUE`;
+            daysLeftDisplay.style.color = "var(--danger-red)";
+            speak("Goal is overdue.");
+        } else {
+            daysLeftDisplay.innerText = `${diffDays} DAYS TO GO`;
+            daysLeftDisplay.style.color = "var(--accent-blue)";
+        }
+    }
+
     function updateProgress() {
-        doneKm.innerText = totalDistance.toFixed(2);
+        let currentTotal = totalDistance + sessionDistance;
+        distEl.innerText = currentTotal.toFixed(2);
+        doneKm.innerText = currentTotal.toFixed(2);
+        
         if (targetGoal > 0) {
-            let balance = Math.max(targetGoal - totalDistance, 0);
+            let balance = Math.max(targetGoal - currentTotal, 0);
             balKm.innerText = balance.toFixed(2);
-            let percentage = Math.min((totalDistance / targetGoal) * 100, 100);
+            let percentage = Math.min((currentTotal / targetGoal) * 100, 100);
             progressBar.style.width = percentage + "%";
-            if (percentage >= 100) progressBar.style.background = "var(--accent-blue)";
+            if (percentage >= 100) {
+                progressBar.style.background = "var(--accent-blue)";
+                checkStatus(); // Update achieved text
+            }
         }
     }
 
@@ -290,11 +341,17 @@
     
     document.getElementById('saveGoal').onclick = () => {
         targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
-        let dateVal = document.getElementById('dateInput').value;
+        targetDate = document.getElementById('dateInput').value;
+        
+        localStorage.setItem('chan_target_km', targetGoal);
+        localStorage.setItem('chan_target_date', targetDate);
+        
         if (targetGoal > 0) {
-            let formattedDue = dateVal ? dateVal.split('-').reverse().join('/') : "N/A";
+            let formattedDue = targetDate ? targetDate.split('-').reverse().join('/') : "N/A";
             dueDateDisplay.innerText = `TARGET: ${targetGoal} KM | DUE: ${formattedDue}`;
+            dueDateDisplay.style.color = "#555";
             updateProgress();
+            checkStatus();
             document.getElementById('goalModal').style.display = 'none';
             speak(`Goal set to ${targetGoal} kilometers.`);
         }
@@ -302,16 +359,16 @@
 
     function start() {
         lastCoords = null;
+        sessionDistance = 0; 
         speak("Starting run.");
         
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
             
-            // Pace fix: Only calculate if we've moved at least 5 meters to avoid huge numbers
-            if(totalDistance > 0.005) {
-                const totalMin = (totalSeconds / 60) / totalDistance;
-                if (totalMin < 30) { // Sane cap for pace
+            if(sessionDistance > 0.005) {
+                const totalMin = (totalSeconds / 60) / sessionDistance;
+                if (totalMin < 30) {
                     paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
                 }
             } else {
@@ -320,8 +377,7 @@
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            // Distance fix: Loosened accuracy to 60m for real-world usage
-            if (pos.coords.accuracy > 60) return;
+            if (pos.coords.accuracy > 35) return;
 
             if (lastCoords) {
                 const R = 6371;
@@ -330,13 +386,13 @@
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
-                // Distance fix: Lowered movement threshold to 1 meter (0.001)
-                if (d > 0.001) { 
-                    totalDistance += d; 
-                    distEl.innerText = totalDistance.toFixed(2); 
+                if (d > 0.0015) { 
+                    sessionDistance += d; 
                     updateProgress();
-                    if (Math.floor(totalDistance) > lastFullKm) {
-                        lastFullKm = Math.floor(totalDistance);
+                    
+                    let currentTotal = totalDistance + sessionDistance;
+                    if (Math.floor(currentTotal) > lastFullKm) {
+                        lastFullKm = Math.floor(currentTotal);
                         lapData.push({km: lastFullKm, pace: paceEl.innerText});
                         const row = document.createElement('div');
                         row.style.cssText = "display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid #1c1c1e;";
@@ -347,13 +403,7 @@
                 }
             }
             lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-        }, (err) => {
-            console.error("GPS Error:", err);
-        }, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000
-        });
+        }, null, {enableHighAccuracy:true, maximumAge:0, timeout: 5000});
         setUI('running');
     }
 
@@ -370,25 +420,23 @@
         }
     }
 
-    startBtn.onclick = () => { 
-        if (!watchID) start(); 
-        else { 
-            clearInterval(timerInterval); 
-            navigator.geolocation.clearWatch(watchID); 
-            watchID = null; 
-            setUI('paused'); 
-        } 
-    };
-
+    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
+    
     stopBtn.onclick = () => { 
-        clearInterval(timerInterval); 
-        if(watchID) navigator.geolocation.clearWatch(watchID); 
-        watchID = null; 
-        speak("Workout finished."); 
+        totalDistance += sessionDistance;
+        localStorage.setItem('chan_accumulated_km', totalDistance);
+        sessionDistance = 0;
+        
+        speak("Workout finished and saved."); 
         setUI('stopped'); 
     };
 
-    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
+    document.getElementById('resetBtn').onclick = () => { 
+        if(confirm("Reset session? (Goal progress is safe)")) {
+            location.reload(); 
+        }
+    };
+    
     document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
 
@@ -396,7 +444,7 @@
         const tx = db.transaction(["runs"], "readwrite");
         tx.objectStore("runs").add({
             date: document.getElementById('fullDate').innerText,
-            distance: totalDistance.toFixed(2),
+            distance: (totalDistance).toFixed(2),
             pace: paceEl.innerText,
             duration: timerEl.innerText
         });
@@ -410,7 +458,7 @@
         doc.setFontSize(12); doc.setTextColor(0, 0, 0);
         doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 45);
         doc.text(`FINISH TIME: ${document.getElementById('liveClock').innerText}`, 20, 52);
-        doc.text(`TOTAL DISTANCE: ${totalDistance.toFixed(2)} KM`, 20, 65);
+        doc.text(`TOTAL DISTANCE: ${distEl.innerText} KM`, 20, 65);
         doc.text(`AVG PACE: ${paceEl.innerText} /KM`, 20, 75);
         doc.save(`Run_Report_${Date.now()}.pdf`);
     };
