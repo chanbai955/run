@@ -33,7 +33,6 @@
             align-items: center; 
         }
 
-        /* ULTRA BRIGHT HEADER */
         .header-info { display: flex; flex-direction: column; min-width: 100px; }
         #fullDate { 
             color: #ffffff; 
@@ -260,20 +259,12 @@
     </div>
 
 <script>
-    // Logic Persistence
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
 
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
     let lastFullKm = Math.floor(totalDistance), lapData = [];
-    
-    // Auto-Pause tuned to 2 Seconds
-    let isAutoPaused = false;
-    let lastMoveTime = Date.now();
-    const AUTO_PAUSE_DELAY = 2000; // Trigger after 2 seconds of inactivity
-    const AUTO_PAUSE_SPEED = 0.7; // km/h threshold
-
     const { jsPDF } = window.jspdf;
 
     let db;
@@ -297,7 +288,8 @@
     const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'),
           paceEl = document.getElementById('pace'), startBtn = document.getElementById('startBtn'),
           stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
-          saveDbBtn = document.getElementById('saveDbBtn'), progressBar = document.getElementById('progressBar'),
+          saveDbBtn = document.getElementById('saveDbBtn'), openHistory = document.getElementById('openHistory'),
+          progressBar = document.getElementById('progressBar'),
           doneKm = document.getElementById('doneKm'), balKm = document.getElementById('balKm'),
           dueDateDisplay = document.getElementById('dueDateDisplay'),
           daysLeftDisplay = document.getElementById('daysLeftDisplay');
@@ -361,54 +353,32 @@
 
     function start() {
         lastCoords = null;
-        isAutoPaused = false;
-        lastMoveTime = Date.now();
-        speak("Starting.");
-        
+        speak("Starting run.");
         timerInterval = setInterval(() => {
-            if (!isAutoPaused) {
-                totalSeconds++;
-                timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-                
-                if(sessionDistance > 0.005) {
-                    const totalMin = (totalSeconds / 60) / sessionDistance;
-                    if (totalMin < 30) paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
-                }
-
-                // Auto-Pause check
-                if (Date.now() - lastMoveTime > AUTO_PAUSE_DELAY) {
-                    isAutoPaused = true;
-                    speak("Paused.");
-                    setUI('paused');
-                }
+            totalSeconds++;
+            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
+            if(sessionDistance > 0.005) {
+                const totalMin = (totalSeconds / 60) / sessionDistance;
+                if (totalMin < 30) paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
             }
         }, 1000);
 
+        // Strava-Style Filtering Logic
         watchID = navigator.geolocation.watchPosition(pos => {
-            if (pos.coords.accuracy > 30) return;
-            
-            const currentSpeed = (pos.coords.speed || 0) * 3.6;
-            if (currentSpeed > AUTO_PAUSE_SPEED) {
-                lastMoveTime = Date.now();
-                if (isAutoPaused) {
-                    isAutoPaused = false;
-                    speak("Resuming.");
-                    setUI('running');
-                }
-            }
+            // Filter 1: Accuracy check
+            if (pos.coords.accuracy > 25) return; 
 
-            if (lastCoords && !isAutoPaused) {
+            if (lastCoords) {
                 const R = 6371;
                 const dLat = (pos.coords.latitude-lastCoords.lat)*Math.PI/180;
                 const dLon = (pos.coords.longitude-lastCoords.lon)*Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
-                if (d > 0.002) { 
+                // Filter 2: Ignore drift (anything less than 3 meters)
+                if (d > 0.003) { 
                     sessionDistance += d; 
                     updateProgress();
-                    lastMoveTime = Date.now(); // Movement detected
-                    
                     let currentTotal = totalDistance + sessionDistance;
                     if (Math.floor(currentTotal) > lastFullKm) {
                         lastFullKm = Math.floor(currentTotal);
@@ -417,7 +387,7 @@
                         row.style.cssText = "display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid #1c1c1e;";
                         row.innerHTML = `<span style="color:var(--neon-green); font-weight:bold;">KM ${lastFullKm}</span><span>${paceEl.innerText}</span>`;
                         document.getElementById('lapList').prepend(row);
-                        speak(`${lastFullKm} kilometers.`);
+                        speak(`${lastFullKm} kilometers reached.`);
                     }
                 }
             }
@@ -429,27 +399,28 @@
     function setUI(state) {
         if (state === 'running') {
             document.getElementById('startIcon').innerText = 'pause'; startBtn.className = 'btn btn-main pause';
-            stopBtn.classList.add('hidden');
+            stopBtn.classList.add('hidden'); pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden'); openHistory.classList.add('hidden');
         } else if (state === 'paused') {
             document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
-            stopBtn.classList.remove('hidden');
+            stopBtn.classList.remove('hidden'); openHistory.classList.remove('hidden');
         } else if (state === 'stopped') {
             startBtn.classList.add('hidden'); stopBtn.classList.add('hidden');
-            pdfBtn.classList.remove('hidden'); saveDbBtn.classList.remove('hidden');
+            pdfBtn.classList.remove('hidden'); saveDbBtn.classList.remove('hidden'); openHistory.classList.remove('hidden');
+        } else if (state === 'reset') {
+            startBtn.classList.remove('hidden'); 
+            document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
+            stopBtn.classList.remove('hidden');
+            pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden'); openHistory.classList.add('hidden');
         }
     }
 
-    startBtn.onclick = () => { 
-        if (!watchID) start(); 
-        else if (isAutoPaused) { isAutoPaused = false; setUI('running'); speak("Resumed."); }
-        else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } 
-    };
+    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
     
     stopBtn.onclick = () => { 
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
         sessionDistance = 0; 
-        speak("Finished."); 
+        speak("Workout finished and saved."); 
         setUI('stopped'); 
     };
 
@@ -459,8 +430,8 @@
             if(watchID) navigator.geolocation.clearWatch(watchID);
             watchID = null; sessionDistance = 0; totalSeconds = 0;
             distEl.innerText = "0.00"; timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
-            setUI('paused'); updateProgress();
-            document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
+            setUI('reset'); 
+            updateProgress();
         }
     };
 
@@ -480,6 +451,23 @@
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
+    
+    saveDbBtn.onclick = () => {
+        const tx = db.transaction(["runs"], "readwrite");
+        tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: (totalDistance).toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText });
+        alert("Session saved to History!");
+    };
+    pdfBtn.onclick = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(22); doc.setTextColor(50, 215, 75);
+        doc.text("CHANTHIRAN PERFORMANCE LOG", 20, 30);
+        doc.setFontSize(12); doc.setTextColor(0, 0, 0);
+        doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 45);
+        doc.text(`FINISH TIME: ${document.getElementById('liveClock').innerText}`, 20, 52);
+        doc.text(`TOTAL DISTANCE: ${distEl.innerText} KM`, 20, 65);
+        doc.text(`AVG PACE: ${paceEl.innerText} /KM`, 20, 75);
+        doc.save(`Run_Report_${Date.now()}.pdf`);
+    };
 </script>
 </body>
 </html>
