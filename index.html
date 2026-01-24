@@ -33,9 +33,22 @@
             align-items: center; 
         }
 
-        .header-info { display: flex; flex-direction: column; min-width: 95px; }
-        #fullDate { color: #fff; font-size: 0.9rem; font-weight: 700; letter-spacing: 0.5px; }
-        #liveClock { color: #888; font-size: 0.75rem; margin-top: 2px; }
+        /* ULTRA BRIGHT HEADER */
+        .header-info { display: flex; flex-direction: column; min-width: 100px; }
+        #fullDate { 
+            color: #ffffff; 
+            font-size: 1.1rem; 
+            font-weight: 900; 
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        #liveClock { 
+            color: #ffffff; 
+            font-size: 1rem; 
+            margin-top: 5px; 
+            font-weight: 800;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+        }
 
         .title-container {
             flex: 1;
@@ -95,8 +108,15 @@
             border-top: 1px solid #1c1c1e;
             padding-top: 25px;
         }
-        .stat-box h2 { margin: 0; font-size: 2.1rem; font-weight: 700; color: #fff; }
-        .stat-box p { margin: 5px 0 0; color: #555; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;}
+
+        .stat-box h2 { 
+            margin: 0; 
+            font-size: 2.1rem; 
+            font-weight: 800; 
+            color: #ffffff; 
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); 
+        }
+        .stat-box p { margin: 5px 0 0; color: #888; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px;}
 
         .controls-bar {
             background: #121212;
@@ -240,12 +260,20 @@
     </div>
 
 <script>
+    // Logic Persistence
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
 
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
     let lastFullKm = Math.floor(totalDistance), lapData = [];
+    
+    // Auto-Pause tuned to 2 Seconds
+    let isAutoPaused = false;
+    let lastMoveTime = Date.now();
+    const AUTO_PAUSE_DELAY = 2000; // Trigger after 2 seconds of inactivity
+    const AUTO_PAUSE_SPEED = 0.7; // km/h threshold
+
     const { jsPDF } = window.jspdf;
 
     let db;
@@ -292,14 +320,12 @@
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
-        
         const today = new Date().setHours(0,0,0,0);
         const due = new Date(targetDate).setHours(0,0,0,0);
         const diffTime = due - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const currentTotal = totalDistance + sessionDistance;
 
-        // Check if goal achieved
         if (currentTotal >= targetGoal) {
             daysLeftDisplay.innerText = "GOAL ACHIEVED! WELL DONE!";
             daysLeftDisplay.style.color = "var(--neon-green)";
@@ -307,12 +333,10 @@
             return;
         }
 
-        // Check for Overdue
         if (diffDays < 0) {
             dueDateDisplay.innerHTML = `<span style="color:var(--danger-red)">OVERDUE!</span> TARGET: ${targetGoal} KM | DUE: ${targetDate.split('-').reverse().join('/')}`;
             daysLeftDisplay.innerText = `${Math.abs(diffDays)} DAYS PAST DUE`;
             daysLeftDisplay.style.color = "var(--danger-red)";
-            speak("Goal is overdue.");
         } else {
             daysLeftDisplay.innerText = `${diffDays} DAYS TO GO`;
             daysLeftDisplay.style.color = "var(--accent-blue)";
@@ -320,10 +344,9 @@
     }
 
     function updateProgress() {
+        distEl.innerText = sessionDistance.toFixed(2); 
         let currentTotal = totalDistance + sessionDistance;
-        distEl.innerText = currentTotal.toFixed(2);
         doneKm.innerText = currentTotal.toFixed(2);
-        
         if (targetGoal > 0) {
             let balance = Math.max(targetGoal - currentTotal, 0);
             balKm.innerText = balance.toFixed(2);
@@ -331,64 +354,60 @@
             progressBar.style.width = percentage + "%";
             if (percentage >= 100) {
                 progressBar.style.background = "var(--accent-blue)";
-                checkStatus(); // Update achieved text
+                checkStatus();
             }
         }
     }
 
-    document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
-    document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
-    
-    document.getElementById('saveGoal').onclick = () => {
-        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
-        targetDate = document.getElementById('dateInput').value;
-        
-        localStorage.setItem('chan_target_km', targetGoal);
-        localStorage.setItem('chan_target_date', targetDate);
-        
-        if (targetGoal > 0) {
-            let formattedDue = targetDate ? targetDate.split('-').reverse().join('/') : "N/A";
-            dueDateDisplay.innerText = `TARGET: ${targetGoal} KM | DUE: ${formattedDue}`;
-            dueDateDisplay.style.color = "#555";
-            updateProgress();
-            checkStatus();
-            document.getElementById('goalModal').style.display = 'none';
-            speak(`Goal set to ${targetGoal} kilometers.`);
-        }
-    };
-
     function start() {
         lastCoords = null;
-        sessionDistance = 0; 
-        speak("Starting run.");
+        isAutoPaused = false;
+        lastMoveTime = Date.now();
+        speak("Starting.");
         
         timerInterval = setInterval(() => {
-            totalSeconds++;
-            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            
-            if(sessionDistance > 0.005) {
-                const totalMin = (totalSeconds / 60) / sessionDistance;
-                if (totalMin < 30) {
-                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+            if (!isAutoPaused) {
+                totalSeconds++;
+                timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
+                
+                if(sessionDistance > 0.005) {
+                    const totalMin = (totalSeconds / 60) / sessionDistance;
+                    if (totalMin < 30) paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
                 }
-            } else {
-                paceEl.innerText = `0'00"`;
+
+                // Auto-Pause check
+                if (Date.now() - lastMoveTime > AUTO_PAUSE_DELAY) {
+                    isAutoPaused = true;
+                    speak("Paused.");
+                    setUI('paused');
+                }
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            if (pos.coords.accuracy > 35) return;
+            if (pos.coords.accuracy > 30) return;
+            
+            const currentSpeed = (pos.coords.speed || 0) * 3.6;
+            if (currentSpeed > AUTO_PAUSE_SPEED) {
+                lastMoveTime = Date.now();
+                if (isAutoPaused) {
+                    isAutoPaused = false;
+                    speak("Resuming.");
+                    setUI('running');
+                }
+            }
 
-            if (lastCoords) {
+            if (lastCoords && !isAutoPaused) {
                 const R = 6371;
                 const dLat = (pos.coords.latitude-lastCoords.lat)*Math.PI/180;
                 const dLon = (pos.coords.longitude-lastCoords.lon)*Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
-                if (d > 0.0015) { 
+                if (d > 0.002) { 
                     sessionDistance += d; 
                     updateProgress();
+                    lastMoveTime = Date.now(); // Movement detected
                     
                     let currentTotal = totalDistance + sessionDistance;
                     if (Math.floor(currentTotal) > lastFullKm) {
@@ -398,7 +417,7 @@
                         row.style.cssText = "display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid #1c1c1e;";
                         row.innerHTML = `<span style="color:var(--neon-green); font-weight:bold;">KM ${lastFullKm}</span><span>${paceEl.innerText}</span>`;
                         document.getElementById('lapList').prepend(row);
-                        speak(`${lastFullKm} kilometers reached.`);
+                        speak(`${lastFullKm} kilometers.`);
                     }
                 }
             }
@@ -410,7 +429,7 @@
     function setUI(state) {
         if (state === 'running') {
             document.getElementById('startIcon').innerText = 'pause'; startBtn.className = 'btn btn-main pause';
-            stopBtn.classList.add('hidden'); pdfBtn.classList.add('hidden'); saveDbBtn.classList.add('hidden');
+            stopBtn.classList.add('hidden');
         } else if (state === 'paused') {
             document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
             stopBtn.classList.remove('hidden');
@@ -420,48 +439,47 @@
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
+    startBtn.onclick = () => { 
+        if (!watchID) start(); 
+        else if (isAutoPaused) { isAutoPaused = false; setUI('running'); speak("Resumed."); }
+        else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } 
+    };
     
     stopBtn.onclick = () => { 
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
-        sessionDistance = 0;
-        
-        speak("Workout finished and saved."); 
+        sessionDistance = 0; 
+        speak("Finished."); 
         setUI('stopped'); 
     };
 
     document.getElementById('resetBtn').onclick = () => { 
-        if(confirm("Reset session? (Goal progress is safe)")) {
-            location.reload(); 
+        if(confirm("Reset run?")) {
+            clearInterval(timerInterval);
+            if(watchID) navigator.geolocation.clearWatch(watchID);
+            watchID = null; sessionDistance = 0; totalSeconds = 0;
+            distEl.innerText = "0.00"; timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
+            setUI('paused'); updateProgress();
+            document.getElementById('startIcon').innerText = 'play_arrow'; startBtn.className = 'btn btn-main start';
+        }
+    };
+
+    document.getElementById('saveGoal').onclick = () => {
+        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
+        targetDate = document.getElementById('dateInput').value;
+        localStorage.setItem('chan_target_km', targetGoal);
+        localStorage.setItem('chan_target_date', targetDate);
+        if (targetGoal > 0) {
+            updateProgress(); checkStatus();
+            document.getElementById('goalModal').style.display = 'none';
+            speak("Goal set.");
         }
     };
     
     document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-
-    saveDbBtn.onclick = () => {
-        const tx = db.transaction(["runs"], "readwrite");
-        tx.objectStore("runs").add({
-            date: document.getElementById('fullDate').innerText,
-            distance: (totalDistance).toFixed(2),
-            pace: paceEl.innerText,
-            duration: timerEl.innerText
-        });
-        alert("Session saved to History!");
-    };
-
-    pdfBtn.onclick = () => {
-        const doc = new jsPDF();
-        doc.setFontSize(22); doc.setTextColor(50, 215, 75);
-        doc.text("CHANTHIRAN PERFORMANCE LOG", 20, 30);
-        doc.setFontSize(12); doc.setTextColor(0, 0, 0);
-        doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 45);
-        doc.text(`FINISH TIME: ${document.getElementById('liveClock').innerText}`, 20, 52);
-        doc.text(`TOTAL DISTANCE: ${distEl.innerText} KM`, 20, 65);
-        doc.text(`AVG PACE: ${paceEl.innerText} /KM`, 20, 75);
-        doc.save(`Run_Report_${Date.now()}.pdf`);
-    };
+    document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
 </script>
 </body>
 </html>
