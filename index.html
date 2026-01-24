@@ -62,6 +62,14 @@
         .app-subtitle { color: #fff; font-size: 0.55rem; font-weight: 400; letter-spacing: 3px; text-transform: uppercase; font-family: 'Courier New', Courier, monospace; margin-top: 2px; opacity: 0.7; }
 
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
+        
+        /* Signal Bar Styling */
+        .signal-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.7rem; font-weight: 800; color: #555; }
+        .signal-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; }
+        .signal-good { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+        .signal-poor { background: #E6B400; }
+        .signal-none { background: var(--danger-red); }
+
         .main-stat {
             font-size: clamp(5.5rem, 20vw, 7.5rem); 
             font-weight: 900; 
@@ -139,6 +147,10 @@
     </div>
     
     <div class="main-display">
+        <div class="signal-wrapper">
+            <div id="signalDot" class="signal-dot"></div>
+            <span id="signalText">GPS SIGNAL: SEARCHING</span>
+        </div>
         <p class="main-stat" id="distance">0.00</p>
         <p class="label">KILOMETERS</p>
         <div class="stats-grid">
@@ -167,8 +179,31 @@
         </div>
     </div>
 
-    <div id="goalModal">... (as before) ...</div>
-    <div id="historyModal">... (as before) ...</div>
+    <div id="goalModal">
+        <div class="modal-card">
+            <h2>SET TARGET</h2>
+            <div class="input-group">
+                <label>TARGET DISTANCE (KM)</label>
+                <input type="number" id="goalInput" step="0.1" placeholder="e.g. 10.0">
+            </div>
+            <div class="input-group">
+                <label>DUE DATE</label>
+                <input type="date" id="dateInput">
+            </div>
+            <div class="modal-actions">
+                <button id="saveGoal" class="btn start" style="width:100%; padding:14px; border-radius:12px; font-weight:800;">SET GOAL</button>
+                <button id="closeGoal" class="btn" style="background:none; color:#666; font-size:0.85rem; font-weight:bold;">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+            <h1 style="margin:0; font-size: 1.8rem;">LAP HISTORY</h1>
+            <button id="closeHistory" class="btn" style="background:transparent; color:#fff;"><span class="material-icons-round" style="font-size: 2.5rem;">close</span></button>
+        </div>
+        <div id="lapList" style="overflow-y: auto; flex: 1;"></div>
+    </div>
 
 <script>
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
@@ -179,20 +214,27 @@
     let lastFullKm = Math.floor(totalDistance);
     const { jsPDF } = window.jspdf;
 
-    // UI Elements
     const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'),
           paceEl = document.getElementById('pace'), startBtn = document.getElementById('startBtn'),
           stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
           saveDbBtn = document.getElementById('saveDbBtn'), openHistory = document.getElementById('openHistory'),
           progressBar = document.getElementById('progressBar'), doneKm = document.getElementById('doneKm'), 
           balKm = document.getElementById('balKm'), dueDateDisplay = document.getElementById('dueDateDisplay'),
-          daysLeftDisplay = document.getElementById('daysLeftDisplay');
+          daysLeftDisplay = document.getElementById('daysLeftDisplay'), signalDot = document.getElementById('signalDot'),
+          signalText = document.getElementById('signalText');
 
-    // Clock
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
 
     window.addEventListener('DOMContentLoaded', () => { updateProgress(); checkStatus(); });
+
+    // RESTORED VOICE FUNCTION
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+    }
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
@@ -207,6 +249,7 @@
         } else if (diffDays < 0) {
             daysLeftDisplay.innerText = "OVERDUE!";
             daysLeftDisplay.style.color = "var(--danger-red)";
+            speak("Your goal is overdue.");
         } else {
             daysLeftDisplay.innerText = `${diffDays} DAYS TO GO`;
             daysLeftDisplay.style.color = "var(--accent-blue)";
@@ -223,8 +266,22 @@
         }
     }
 
+    function updateSignalStatus(accuracy) {
+        if (accuracy < 30) {
+            signalDot.className = "signal-dot signal-good";
+            signalText.innerText = "GPS SIGNAL: STRONG";
+        } else if (accuracy < 80) {
+            signalDot.className = "signal-dot signal-poor";
+            signalText.innerText = "GPS SIGNAL: POOR";
+        } else {
+            signalDot.className = "signal-dot signal-none";
+            signalText.innerText = "GPS SIGNAL: WEAK";
+        }
+    }
+
     function start() {
         lastCoords = null;
+        speak("Starting run.");
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
@@ -234,9 +291,8 @@
             }
         }, 1000);
 
-        // RESTORED: High Sensitivity Location Tracking
         watchID = navigator.geolocation.watchPosition(pos => {
-            // RELAXED FILTER: Accept accuracy up to 80m for indoor testing
+            updateSignalStatus(pos.coords.accuracy);
             if (pos.coords.accuracy > 80) return; 
 
             if (lastCoords) {
@@ -246,14 +302,22 @@
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
-                // RELAXED THRESHOLD: Move just 1 meter to record distance
                 if (d > 0.001) { 
                     sessionDistance += d; 
                     updateProgress();
+                    
+                    let currentTotal = totalDistance + sessionDistance;
+                    if (Math.floor(currentTotal) > lastFullKm) {
+                        lastFullKm = Math.floor(currentTotal);
+                        speak(`${lastFullKm} kilometers reached.`);
+                    }
                 }
             }
             lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-        }, null, {enableHighAccuracy:true, maximumAge:0, timeout: 5000});
+        }, err => {
+            signalDot.className = "signal-dot signal-none";
+            signalText.innerText = "GPS ERROR: " + err.message;
+        }, {enableHighAccuracy:true, maximumAge:0, timeout: 5000});
         setUI('running');
     }
 
@@ -274,11 +338,12 @@
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); } };
+    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; setUI('paused'); speak("Workout paused."); } };
     
     stopBtn.onclick = () => { 
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
+        speak("Workout finished and saved."); 
         setUI('stopped'); 
     };
 
@@ -292,7 +357,22 @@
         }
     };
     
-    // ... Goal saving & History logic remains the same ...
+    document.getElementById('saveGoal').onclick = () => {
+        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0;
+        targetDate = document.getElementById('dateInput').value;
+        localStorage.setItem('chan_target_km', targetGoal);
+        localStorage.setItem('chan_target_date', targetDate);
+        if (targetGoal > 0) {
+            updateProgress(); checkStatus();
+            document.getElementById('goalModal').style.display = 'none';
+            speak("Goal set.");
+        }
+    };
+
+    document.getElementById('openHistory').onclick = () => document.getElementById('historyModal').style.display = 'flex';
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('closeGoal').onclick = () => document.getElementById('goalModal').style.display = 'none';
 </script>
 </body>
 </html>
