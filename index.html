@@ -200,7 +200,8 @@
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
     let lastSpokenDistance = 0;
     let db;
-    let isPaused = false; // Added state to track pause/resume
+    let isPaused = false;
+    let lastPointTime = 0;
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
@@ -263,13 +264,11 @@
     }
 
     function start() {
-        if (isPaused) {
-            speak("Resuming");
-        } else {
-            speak("Running");
-        }
+        if (isPaused) speak("Resuming");
+        else speak("Running");
         isPaused = false;
         lastCoords = null;
+        lastPointTime = Date.now();
         
         timerInterval = setInterval(() => {
             totalSeconds++;
@@ -282,28 +281,37 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            if (pos.coords.accuracy > 50) return; 
             
+            // 1. SIGNAL QUALITY FILTER (Only accept accurate points)
+            if (pos.coords.accuracy > 30) return; 
+
             if (lastCoords) {
-                const R = 6371;
+                const R = 6371; 
                 const lat1 = lastCoords.lat * Math.PI/180;
                 const lat2 = pos.coords.latitude * Math.PI/180;
                 const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const d = R * c;
 
-                // SPEED FILTER: Filter out jitter if calculated speed is < 1 km/h (approx 0.27 m/s)
-                // Calculated as distance (d) over a 1 second interval (default check)
-                if (d > 0.005 && d < 0.01) { 
+                const timeNow = Date.now();
+                const timeDiffHours = (timeNow - lastPointTime) / 3600000;
+                const speed = d / timeDiffHours;
+
+                // 2. IDLE DRIFT FILTER (The Strava logic)
+                // - Ignore if distance moved is less than 5 meters
+                // - Ignore if speed is less than 2.5 km/h (sitting/standing jitter)
+                if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; 
                     updateProgress(); 
-                } else if (d >= 0.01) { // Normal running speed logic
-                    sessionDistance += d;
-                    updateProgress();
+                    lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
+                    lastPointTime = timeNow;
                 }
+            } else {
+                lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
+                lastPointTime = Date.now();
             }
-            lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
         }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
         
         setUI('running');
@@ -321,9 +329,8 @@
     }
 
     startBtn.onclick = () => { 
-        if (!watchID) {
-            start(); 
-        } else { 
+        if (!watchID) start(); 
+        else { 
             clearInterval(timerInterval); 
             navigator.geolocation.clearWatch(watchID); 
             watchID = null; 
