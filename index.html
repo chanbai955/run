@@ -26,6 +26,7 @@
             overflow: hidden;
         }
 
+        /* Header */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; min-width: 100px; }
         #fullDate { color: #ffffff; font-size: 1.1rem; font-weight: 900; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
@@ -34,6 +35,7 @@
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
 
+        /* Main Stat Display */
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
         .stat-wrapper { display: flex; flex-direction: column; align-items: center; text-align: center; }
         .main-stat {
@@ -47,7 +49,6 @@
             filter: drop-shadow(0 0 15px rgba(50, 215, 75, 0.3));
         }
 
-        /* CENTERED KM TEXT AND GPS ICON TO THE RIGHT */
         .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 15px; width: 100%; }
         .label { font-size: 1.1rem; color: #666; letter-spacing: 6px; font-weight: 900; margin: 0; }
         #gpsIcon { font-size: 32px; transition: all 0.3s ease; color: #333; }
@@ -59,6 +60,7 @@
         .stat-box h2 { margin: 0; font-size: 2.1rem; font-weight: 800; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
         .stat-box p { margin: 5px 0 0; color: #888; font-size: 0.75rem; font-weight: bold; }
 
+        /* Controls Section */
         .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; }
         .goal-container { width: 90%; margin-bottom: 15px; cursor: pointer; }
         .goal-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: #888; margin-bottom: 8px; font-weight: bold; }
@@ -73,7 +75,7 @@
         #dueDateDisplay { font-size: 0.75rem; color: #777; margin-top: 5px; text-align: center; font-weight: 700; }
         #daysLeftDisplay { font-size: 0.7rem; color: var(--accent-blue); margin-top: 5px; text-align: center; font-weight: 900; }
 
-        /* BUTTON ROW - PDF RESTORED TO SAME LINE */
+        /* Buttons */
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.1s ease; }
         .btn-main { width: 85px; height: 85px; }
@@ -83,21 +85,37 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
+        /* Modals & Inputs */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
+        .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .modal-card { background: var(--card-bg); width: 100%; max-width: 340px; padding: 25px; border-radius: 25px; text-align: center; border: 1px solid #333; }
+        
+        .input-group-container { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .modal-card input { 
+            width: 100%; 
+            padding: 18px !important; 
+            border-radius: 15px; 
+            border: 1px solid #333; 
+            background: #000; 
+            color: #fff; 
+            font-size: 1.2rem !important; 
+            box-sizing: border-box; 
+            font-weight: 600; 
+        }
+
+        .btn-compact { 
+            width: 140px !important; 
+            padding: 12px 0 !important; 
+            margin: 0 auto; 
+            font-size: 0.9rem !important; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            border-radius: 30px !important; 
+        }
+
         .quick-note { background: var(--card-bg); width: 100%; max-width: 500px; border-radius: 30px 30px 0 0; padding: 25px; max-height: 85vh; overflow-y: auto; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out; position: relative; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; position: sticky; top: 0; background: var(--card-bg); z-index: 10; }
-        .note-header h2 { margin: 0; font-size: 1.2rem; color: var(--neon-green); letter-spacing: 1px; }
-        .close-note-btn { background: #2c2c2e; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
         .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); }
-        .history-item .date { font-weight: 800; font-size: 0.9rem; color: #fff; margin-bottom: 5px; }
-        .history-item .details { font-size: 0.8rem; color: #bbb; display: flex; justify-content: space-between; }
-        .history-item .loc { font-size: 0.7rem; color: var(--accent-blue); margin-top: 8px; text-transform: uppercase; font-weight: 700; }
-        .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-
-        .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; padding: 20px; }
-        .modal-card { background: var(--card-bg); width: 100%; max-width: 320px; padding: 25px; border-radius: 25px; text-align: center; border: 1px solid #333; }
-        .input-group input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #000; color: #fff; font-size: 1rem; box-sizing: border-box; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -109,7 +127,7 @@
         </div>
         <div class="title-container">
             <div class="app-title">Chanthiran</div>
-            <div class="app-subtitle">RUN TRACKER</div>
+            <div class="app-subtitle">RUN TRACKER PRO</div>
         </div>
         <button id="resetBtn" class="btn reset-btn"><span class="material-icons-round">refresh</span></button>
     </div>
@@ -151,6 +169,7 @@
 
         <div class="button-row">
             <button id="openHistory" class="btn btn-side" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
+            <button id="newRunBtn" class="btn btn-side" style="color:var(--warning-yellow);"><span class="material-icons-round">add_circle</span></button>
             <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
             <button id="saveDbBtn" class="btn btn-side hidden" style="color:var(--neon-green);"><span class="material-icons-round">cloud_upload</span></button>
@@ -158,16 +177,37 @@
         </div>
     </div>
 
-    <div id="historyModal" class="modal">
-        <div class="quick-note">
-            <div class="note-header"><h2>RUN NOTES</h2><div class="close-note-btn" id="closeHistory"><span class="material-icons-round">close</span></div></div>
-            <div id="lapList"></div>
-            <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
+    <div id="locModal" class="standard-modal">
+        <div class="modal-card">
+            <h2>RUN LOCATION</h2>
+            <div class="input-group-container">
+                <input type="text" id="locInput" placeholder="Enter Park/Road">
+            </div>
+            <button id="saveLoc" class="btn start btn-compact">SAVE</button>
         </div>
     </div>
 
-    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>RUN LOCATION</h2><input type="text" id="locInput" class="input-group" placeholder="Enter Park/Road"><button id="saveLoc" class="btn start" style="width:100%; padding:14px; border-radius:12px;">SAVE</button></div></div>
-    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><input type="number" id="goalInput" placeholder="KM"><input type="date" id="dateInput"><button id="saveGoal" class="btn start" style="width:100%; padding:14px; border-radius:12px;">SET</button></div></div>
+    <div id="goalModal" class="standard-modal">
+        <div class="modal-card">
+            <h2>SET TARGET</h2>
+            <div class="input-group-container">
+                <input type="number" id="goalInput" placeholder="KM">
+                <input type="date" id="dateInput">
+            </div>
+            <button id="saveGoal" class="btn start btn-compact">SET</button>
+        </div>
+    </div>
+
+    <div id="historyModal" class="modal">
+        <div class="quick-note">
+            <div class="note-header" style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color:var(--neon-green); margin:0;">RUN NOTES</h2>
+                <div id="closeHistory" style="cursor:pointer; color:#fff;"><span class="material-icons-round">close</span></div>
+            </div>
+            <div id="lapList"></div>
+            <button class="bottom-close-btn" id="bottomCloseHistory" style="width:100%; padding:15px; margin-top:20px; background:#333; border:none; border-radius:12px; color:#fff; font-weight:800; text-transform:uppercase; cursor:pointer;">Close Notes</button>
+        </div>
+    </div>
 
 <script>
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
@@ -175,6 +215,7 @@
     let targetDate = localStorage.getItem('chan_target_date') || "";
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
+    let lastSpokenDistance = 0; // Tracks milestones for 500m intervals
     const { jsPDF } = window.jspdf;
 
     let db;
@@ -186,6 +227,7 @@
           paceEl = document.getElementById('pace'), startBtn = document.getElementById('startBtn'),
           stopBtn = document.getElementById('stopBtn'), pdfBtn = document.getElementById('pdfBtn'),
           saveDbBtn = document.getElementById('saveDbBtn'), openHistory = document.getElementById('openHistory'),
+          newRunBtn = document.getElementById('newRunBtn'),
           progressBar = document.getElementById('progressBar'), doneKm = document.getElementById('doneKm'), 
           balKm = document.getElementById('balKm'), dueDateDisplay = document.getElementById('dueDateDisplay'),
           daysLeftDisplay = document.getElementById('daysLeftDisplay'), gpsIcon = document.getElementById('gpsIcon'),
@@ -206,6 +248,30 @@
             balKm.innerText = Math.max(targetGoal - cur, 0).toFixed(2);
             progressBar.style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
         }
+        
+        // Voice Trigger logic
+        checkDistanceMilestones();
+    }
+
+    function checkDistanceMilestones() {
+        // Only trigger if we've moved at least 500m beyond the last announcement
+        if (sessionDistance >= lastSpokenDistance + 0.5) {
+            lastSpokenDistance = Math.floor(sessionDistance * 2) / 2; // Snap to nearest 0.5km
+            
+            let message = "";
+            const isFullKm = lastSpokenDistance % 1 === 0;
+
+            if (isFullKm) {
+                // KM Milestone: Dist + Pace
+                const paceText = paceEl.innerText.replace("'", " minutes ").replace('"', " seconds");
+                message = `${lastSpokenDistance} kilometers. Pace: ${paceText} per kilometer.`;
+            } else {
+                // 500m Milestone: Just Distance
+                message = `${lastSpokenDistance} kilometers.`;
+            }
+            
+            speak(message);
+        }
     }
 
     function updateGpsIcon(accuracy) {
@@ -213,16 +279,6 @@
         if (accuracy < 30) gpsIcon.classList.add('sig-good');
         else if (accuracy < 80) gpsIcon.classList.add('sig-poor');
         else gpsIcon.classList.add('sig-none');
-    }
-
-    function generatePDF() {
-        const doc = new jsPDF();
-        doc.text("CHAN PERFORMANCE LOG", 20, 20);
-        doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 40);
-        doc.text(`LOCATION: ${runLocation}`, 20, 50);
-        doc.text(`DISTANCE: ${sessionDistance.toFixed(2)} KM`, 20, 60);
-        doc.text(`TIME: ${timerEl.innerText}`, 20, 70);
-        doc.save(`Run_${Date.now()}.pdf`);
     }
 
     function start() {
@@ -257,18 +313,21 @@
             stopBtn.classList.add('hidden');
             saveDbBtn.classList.add('hidden');
             pdfBtn.classList.add('hidden');
+            newRunBtn.classList.add('hidden');
             document.getElementById('startIcon').innerText = 'pause';
         } else if (state === 'paused') {
             startBtn.classList.remove('hidden');
             stopBtn.classList.remove('hidden');
             saveDbBtn.classList.add('hidden');
             pdfBtn.classList.add('hidden');
+            newRunBtn.classList.remove('hidden');
             document.getElementById('startIcon').innerText = 'play_arrow';
         } else if (state === 'stopped') {
             startBtn.classList.add('hidden');
             stopBtn.classList.add('hidden');
             saveDbBtn.classList.remove('hidden');
             pdfBtn.classList.remove('hidden');
+            newRunBtn.classList.remove('hidden');
         }
     }
 
@@ -290,6 +349,20 @@
         speak("Stopped.");
     };
 
+    newRunBtn.onclick = () => {
+        if (confirm("Reset current session to 0.00? (Goals and history are safe)")) {
+            clearInterval(timerInterval);
+            if(watchID) navigator.geolocation.clearWatch(watchID);
+            watchID = null;
+            sessionDistance = 0; totalSeconds = 0; lastCoords = null;
+            lastSpokenDistance = 0; // Reset milestone tracker
+            timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
+            updateProgress(); setUI('paused');
+            document.getElementById('startIcon').innerText = 'play_arrow';
+            speak("New run initialized.");
+        }
+    };
+
     saveDbBtn.onclick = () => {
         const tx = db.transaction(["runs"], "readwrite");
         tx.objectStore("runs").add({ 
@@ -302,9 +375,17 @@
         alert("Run Notes Updated!");
     };
 
-    pdfBtn.onclick = generatePDF;
+    pdfBtn.onclick = () => {
+        const doc = new jsPDF();
+        doc.text("CHAN PERFORMANCE LOG", 20, 20);
+        doc.text(`DATE: ${document.getElementById('fullDate').innerText}`, 20, 40);
+        doc.text(`LOCATION: ${runLocation}`, 20, 50);
+        doc.text(`DISTANCE: ${sessionDistance.toFixed(2)} KM`, 20, 60);
+        doc.text(`TIME: ${timerEl.innerText}`, 20, 70);
+        doc.save(`Run_${Date.now()}.pdf`);
+    };
 
-    document.getElementById('resetBtn').onclick = () => { if(confirm("Reset run?")) location.reload(); };
+    document.getElementById('resetBtn').onclick = () => { if(confirm("Refresh app view?")) location.reload(); };
 
     openHistory.onclick = () => {
         document.getElementById('historyModal').style.display = 'flex';
@@ -314,15 +395,14 @@
             req.result.reverse().forEach(run => {
                 const row = document.createElement('div');
                 row.className = "history-item";
-                row.innerHTML = `<div class="date">${run.date}</div><div class="details"><span>${run.distance} KM</span><span>${run.duration}</span><span>${run.pace}</span></div><div class="loc"><span class="material-icons-round" style="font-size:12px;">place</span> ${run.location}</div>`;
+                row.innerHTML = `<div class="date">${run.date}</div><div class="details"><span>${run.distance} KM</span><span>${run.duration}</span><span>${run.pace}</span></div><div class="loc" style="font-size:0.7rem; color:var(--accent-blue); margin-top:8px; text-transform:uppercase; font-weight:700;"><span class="material-icons-round" style="font-size:12px;">place</span> ${run.location}</div>`;
                 list.appendChild(row);
             });
         };
     };
 
-    const closeFn = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('closeHistory').onclick = closeFn;
-    document.getElementById('bottomCloseHistory').onclick = closeFn;
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
     document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value || "NOT SET"; localStorage.setItem('chan_run_loc', runLocation); locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; };
     document.getElementById('goalTrigger').onclick = () => document.getElementById('goalModal').style.display = 'flex';
