@@ -26,6 +26,7 @@
             overflow: hidden;
         }
 
+        /* Header */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 1.1rem; font-weight: 900; }
@@ -34,6 +35,7 @@
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
 
+        /* Main Display */
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
         .main-stat {
             font-size: clamp(6.5rem, 25vw, 8.5rem); 
@@ -50,6 +52,7 @@
         .stat-box h2 { margin: 0; font-size: 2rem; }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
+        /* Controls Section */
         .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; }
         
         .goal-container { width: 90%; margin-bottom: 5px; }
@@ -58,6 +61,7 @@
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; }
 
+        /* Target Date Info */
         .target-date-info { width: 90%; display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 0.75rem; font-weight: 700; }
         #balDateDisplay { color: #888; }
         #daysLeftDisplay { color: var(--accent-blue); }
@@ -65,6 +69,7 @@
         .location-section { width: 90%; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         #locDisplay { font-size: 0.8rem; color: var(--accent-blue); font-weight: 800; text-transform: uppercase; }
 
+        /* Compact New Run Circle */
         .new-run-circle {
             width: 55px;
             height: 55px;
@@ -83,6 +88,7 @@
         .text-new { font-size: 0.55rem; }
         .text-run { font-size: 0.8rem; }
 
+        /* Button Row */
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
         .btn-main { width: 85px; height: 85px; }
@@ -91,6 +97,7 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
+        /* Modals */
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
         .input-group-container-vertical { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; width: 100%; }
@@ -113,18 +120,7 @@
         }
         .history-content { flex: 1; }
         .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 10px; }
-        .bottom-close-btn { 
-            width: 100%; 
-            padding: 15px; 
-            margin-top: 20px; 
-            background: #333; 
-            border: none; 
-            border-radius: 12px; 
-            color: #fff; 
-            font-weight: 800; 
-            text-transform: uppercase; 
-            cursor: pointer; 
-        }
+        .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -265,18 +261,31 @@
                 paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
             }
         }, 1000);
+
+        // Restored Strava-style Precise Calculation
         watchID = navigator.geolocation.watchPosition(pos => {
-            if (pos.coords.accuracy > 70) return;
+            if (pos.coords.accuracy > 50) return; // Accuracy threshold
+            
             if (lastCoords) {
-                const R = 6371;
-                const dLat = (pos.coords.latitude-lastCoords.lat)*Math.PI/180;
-                const dLon = (pos.coords.longitude-lastCoords.lon)*Math.PI/180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat*Math.PI/180)*Math.cos(pos.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;
-                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                if (d > 0.002) { sessionDistance += d; updateProgress(); }
+                const R = 6371; // Earth Radius in KM
+                const lat1 = lastCoords.lat * Math.PI/180;
+                const lat2 = pos.coords.latitude * Math.PI/180;
+                const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
+                const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
+                
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                          Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const d = R * c;
+
+                if (d > 0.005) { // 5 meter threshold to filter jitter/drift
+                    sessionDistance += d; 
+                    updateProgress(); 
+                }
             }
             lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-        }, null, {enableHighAccuracy:true});
+        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
+        
         setUI('running');
     }
 
@@ -312,19 +321,13 @@
 
     newRunBtn.onclick = () => {
         if (confirm("Reset ALL progress and targets?")) {
-            sessionDistance = 0; 
-            totalDistance = 0; 
-            targetGoal = 0;
-            targetDate = ""; 
-            totalSeconds = 0; 
-            lastSpokenDistance = 0;
+            sessionDistance = 0; totalDistance = 0; targetGoal = 0; targetDate = ""; 
+            totalSeconds = 0; lastSpokenDistance = 0;
             localStorage.setItem('chan_accumulated_km', 0);
             localStorage.removeItem('chan_target_km');
             localStorage.removeItem('chan_target_date'); 
-            updateProgress(); 
-            checkStatus(); 
-            timerEl.innerText = "00:00"; 
-            paceEl.innerText = "0'00\"";
+            updateProgress(); checkStatus(); 
+            timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
             setUI('paused');
         }
     };
@@ -337,8 +340,7 @@
         targetDate = document.getElementById('dateInput').value;
         localStorage.setItem('chan_target_km', targetGoal); 
         localStorage.setItem('chan_target_date', targetDate);
-        updateProgress(); 
-        checkStatus();
+        updateProgress(); checkStatus();
         document.getElementById('goalModal').style.display = 'none'; 
     };
 
@@ -346,9 +348,7 @@
         if (confirm("Delete this run entry?")) {
             const tx = db.transaction("runs", "readwrite");
             tx.objectStore("runs").delete(id);
-            tx.oncomplete = () => {
-                renderHistory();
-            };
+            tx.oncomplete = () => renderHistory();
         }
     }
 
@@ -366,24 +366,17 @@
                         ${run.distance} KM | ${run.duration} | ${run.pace}<br>
                         <small>${run.location}</small>
                     </div>
-                    <div class="history-del-btn" onclick="deleteRun(${run.id})">
-                        <span class="material-icons-round">delete</span>
-                    </div>
+                    <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>
                 `;
                 list.appendChild(row);
             });
         };
     }
 
-    document.getElementById('openHistory').onclick = () => {
-        document.getElementById('historyModal').style.display = 'flex';
-        renderHistory();
-    };
-
+    document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     const closeHistoryFn = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('closeHistory').onclick = closeHistoryFn;
     document.getElementById('bottomCloseHistory').onclick = closeHistoryFn;
-    
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
 </body>
