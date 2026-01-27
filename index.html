@@ -259,19 +259,24 @@
         
         timerInterval = setInterval(() => {
             totalSeconds++;
-            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.005) {
+            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${((totalSeconds%60)).toString().padStart(2,'0')}`;
+            
+            // SMOOTH PACE CALCULATION
+            if(sessionDistance > 0.002) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                if (totalMin < 40) { // If pace is faster than 40 min/km (meaning you are actually moving)
+                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                }
+            } else {
+                paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
-        // RESTORED TRACKING LOGIC
         watchID = navigator.geolocation.watchPosition(pos => {
             const acc = pos.coords.accuracy;
-            gpsIcon.className = 'material-icons-round ' + (acc < 25 ? 'sig-good' : acc < 65 ? 'sig-poor' : 'sig-none');
+            gpsIcon.className = 'material-icons-round ' + (acc < 30 ? 'sig-good' : acc < 70 ? 'sig-poor' : 'sig-none');
             
-            if (acc > 50) return; // Ignore very poor signal
+            if (acc > 55) return; 
 
             if (lastCoords) {
                 const R = 6371; 
@@ -287,8 +292,8 @@
                 const hours = (timeNow - lastPointTime) / 3600000;
                 const speed = d / hours;
 
-                // Restored Thresholds: capture slow walk (1.5km/h) but filter stationary jitter
-                if (d > 0.005 && speed > 1.5 && speed < 35) { 
+                // Threshold: Capture any movement over 1.2km/h (walking)
+                if (d > 0.003 && speed > 1.2 && speed < 35) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
