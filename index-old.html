@@ -6,7 +6,6 @@
     <title>Chan's Run Pro</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
             --neon-green: #32D74B;
@@ -27,7 +26,6 @@
             overflow: hidden;
         }
 
-        /* UI ELEMENTS */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 1.1rem; font-weight: 900; }
@@ -99,7 +97,6 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS */
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
         .input-group-container-vertical { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; width: 100%; }
@@ -108,32 +105,8 @@
         .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); color: #000; border: none; border-radius: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
 
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
+        .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; padding: 25px; max-height: 85vh; overflow-y: auto; }
         
-        /* STICKY HEADER LOGIC */
-        .quick-note { 
-            background: var(--card-bg); 
-            width: 100%; 
-            border-radius: 30px 30px 0 0; 
-            max-height: 85vh; 
-            overflow-y: auto; 
-            position: relative;
-        }
-        
-        .sticky-history-header {
-            position: sticky;
-            top: 0;
-            background: rgba(28, 28, 30, 0.95);
-            backdrop-filter: blur(10px);
-            z-index: 10;
-            padding: 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #333;
-        }
-
-        .history-list-container { padding: 15px 25px 120px 25px; }
-
         .history-item { 
             background: #2c2c2e; 
             margin-bottom: 12px; 
@@ -210,17 +183,12 @@
 
     <div id="historyModal" class="modal">
         <div class="quick-note">
-            <div class="sticky-history-header">
-                <h2 style="color:var(--neon-green); margin:0;">RUN NOTES</h2>
-                <div style="display:flex; gap:20px; align-items:center;">
-                    <span id="exportPdf" class="material-icons-round" style="cursor:pointer; color:var(--danger-red); font-size:28px;">picture_as_pdf</span>
-                    <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
-                </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <h2 style="color:var(--neon-green);">RUN NOTES</h2>
+                <span id="closeHistory" class="material-icons-round" style="cursor:pointer;">close</span>
             </div>
-            <div class="history-list-container">
-                <div id="lapList"></div>
-                <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
-            </div>
+            <div id="lapList"></div>
+            <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
         </div>
     </div>
 
@@ -305,8 +273,11 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
+            
+            // Pace stability check: only calculate pace after moving 50 meters
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
+                // Cap extreme drift pace at 25:00
                 if (totalMin < 25) {
                     paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
                 } else {
@@ -319,6 +290,8 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
+            
+            // 1. SIGNAL QUALITY FILTER (Only accept accurate points)
             if (pos.coords.accuracy > 25) return; 
 
             if (lastCoords) {
@@ -335,6 +308,9 @@
                 const timeDiffHours = (timeNow - lastPointTime) / 3600000;
                 const speed = d / timeDiffHours;
 
+                // 2. IDLE DRIFT FILTER
+                // d > 0.01: Must move at least 10 meters between points
+                // speed > 3.0: Must be moving faster than 3km/h (prevents standing still jitter)
                 if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; 
                     updateProgress(); 
@@ -436,73 +412,6 @@
             });
         };
     }
-
-    document.getElementById('exportPdf').onclick = () => {
-        const tx = db.transaction("runs", "readonly");
-        const req = tx.objectStore("runs").getAll();
-        req.onsuccess = () => {
-            const runs = req.result;
-            if(runs.length === 0) { alert("No run history to export."); return; }
-            
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const accent = [50, 215, 75]; 
-            
-            doc.setFontSize(22);
-            doc.setTextColor(...accent);
-            doc.text("CHAN'S RUN PRO", 14, 20);
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text("PERFORMANCE TRACKING REPORT", 14, 26);
-            
-            const maxDist = Math.max(...runs.map(r => parseFloat(r.distance)));
-            doc.setDrawColor(...accent);
-            doc.setLineWidth(0.5);
-            doc.rect(14, 32, 180, 25);
-            doc.setFontSize(10);
-            doc.setTextColor(0);
-            doc.text(`Total Runs: ${runs.length}`, 20, 40);
-            doc.text(`Lifetime KM: ${totalDistance.toFixed(2)} KM`, 20, 48);
-            doc.text(`Personal Best: ${maxDist.toFixed(2)} KM`, 100, 40);
-            doc.text(`Report Date: ${new Date().toLocaleDateString()}`, 100, 48);
-
-            doc.setFontSize(12);
-            doc.text("RECENT PROGRESS (KM)", 14, 70);
-            const chartRuns = runs.slice(-10);
-            const chartX = 30;
-            const chartY = 110;
-            const barWidth = 10;
-            const chartHeight = 30;
-
-            chartRuns.forEach((run, i) => {
-                const val = parseFloat(run.distance);
-                const h = (val / (maxDist || 1)) * chartHeight;
-                doc.setFillColor(...accent);
-                doc.rect(chartX + (i * 15), chartY - h, barWidth, h, 'F');
-                doc.setFontSize(6);
-                doc.text(run.date.split('/')[0], chartX + (i * 15) + 2, chartY + 5);
-            });
-
-            const tableData = [...runs].reverse().map(run => [
-                run.date,
-                run.distance + " KM",
-                run.duration,
-                run.pace,
-                run.location
-            ]);
-
-            doc.autoTable({
-                startY: 125,
-                head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
-                body: tableData,
-                headStyles: { fillColor: accent, textColor: [0, 0, 0], fontStyle: 'bold' },
-                alternateRowStyles: { fillColor: [245, 245, 245] },
-                margin: { top: 10 }
-            });
-
-            doc.save(`Chan_Run_Report_${new Date().getTime()}.pdf`);
-        };
-    };
 
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     const closeHistoryFn = () => document.getElementById('historyModal').style.display = 'none';
