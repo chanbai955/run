@@ -163,13 +163,15 @@
     let targetDate = localStorage.getItem('chan_target_date') || "";
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null, lastPointTime = 0, lastSpokenDistance = 0, db;
+    let isPaused = false;
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
     dbReq.onsuccess = (e) => db = e.target.result;
 
     const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'), paceEl = document.getElementById('pace'), 
-          startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn'), accDisplay = document.getElementById('accDisplay');
+          startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn'), 
+          startIcon = document.getElementById('startIcon'), accDisplay = document.getElementById('accDisplay');
 
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
@@ -191,8 +193,8 @@
     function updateGpsIcon(accuracy) {
         const icon = document.getElementById('gpsIcon');
         icon.classList.remove('sig-good', 'sig-poor', 'sig-none');
-        if (accuracy < 30) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (STABLE)`; accDisplay.style.color = "var(--accent-blue)"; }
-        else { icon.classList.add('sig-poor'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (DRIFT RISK)`; accDisplay.style.color = "var(--warning-yellow)"; }
+        if (accuracy < 25) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
+        else { icon.classList.add('sig-poor'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (FILTERING)`; accDisplay.style.color = "var(--warning-yellow)"; }
     }
 
     function checkStatus() {
@@ -203,20 +205,40 @@
     }
 
     function start() {
-        lastCoords = null; lastPointTime = Date.now(); speak("Running");
+        if (!isPaused) {
+            speak("Running started");
+            lastPointTime = Date.now();
+        } else {
+            speak("Running resumed");
+        }
+        
+        isPaused = false;
+        startIcon.innerText = "pause";
+        stopBtn.classList.remove('hidden');
+
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            // PACE GATE: Set to 30 meters to stabilize math
-            if(sessionDistance > 0.03) {
+            
+            // STABLE PACE CALCULATION: Active after 50 meters
+            if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                // Only show pace if moving at a reasonable speed (prevents massive drift pace)
+                if (totalMin < 30) {
+                   paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                } else {
+                   paceEl.innerText = "0'00\"";
+                }
+            } else {
+               paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            if (pos.coords.accuracy > 35) return; 
+            
+            // 1. SIGNAL QUALITY LOCK: Discard any point with error > 30m
+            if (pos.coords.accuracy > 30) return; 
 
             if (lastCoords) {
                 const R = 6371;
@@ -224,28 +246,61 @@
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(pos.coords.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                const speed = d / ((Date.now() - lastPointTime) / 3600000);
+                
+                const timeDiff = (Date.now() - lastPointTime) / 3600000;
+                const speed = d / timeDiff;
 
-                // STRICT IDLE BARRIER: Ignore if move < 10m OR speed < 3.0km/h
+                // 2. MOVEMENT BARRIER: Ignore if move < 10m OR speed < 3.0km/h
+                // This stops the app from counting "table drift" while phone is idle.
                 if (d > 0.01 && speed > 3.0) { 
-                    sessionDistance += d; updateProgress();
+                    sessionDistance += d; 
+                    updateProgress();
+                    
                     if (sessionDistance >= lastSpokenDistance + 0.5) {
                         lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-                        speak(`${lastSpokenDistance} km. Pace ${Math.floor((totalSeconds/60)/sessionDistance)} minutes.`);
+                        const paceMins = Math.floor((totalSeconds/60)/sessionDistance);
+                        speak(`${lastSpokenDistance} kilometers. Pace ${paceMins} minutes.`);
                     }
-                    lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now();
+                    
+                    lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; 
+                    lastPointTime = Date.now();
                 }
-            } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
-        }, null, {enableHighAccuracy: true});
-        startBtn.classList.add('hidden'); stopBtn.classList.remove('hidden');
+            } else { 
+                lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; 
+                lastPointTime = Date.now(); 
+            }
+        }, null, {enableHighAccuracy: true, maximumAge: 0, timeout: 5000});
     }
 
+    function pause() {
+        clearInterval(timerInterval);
+        navigator.geolocation.clearWatch(watchID);
+        isPaused = true;
+        startIcon.innerText = "play_arrow";
+        speak("Paused");
+    }
+
+    startBtn.onclick = () => {
+        if (startIcon.innerText === "pause") pause();
+        else start();
+    };
+
     stopBtn.onclick = () => {
-        clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID);
-        totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
+        clearInterval(timerInterval);
+        navigator.geolocation.clearWatch(watchID);
+        totalDistance += sessionDistance;
+        localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
-        speak("Finished"); location.reload();
+        speak("Finished and Saved");
+        location.reload();
+    };
+
+    document.getElementById('newRunBtn').onclick = () => { 
+        if(confirm("Start NEW run session? History and Progress will reset.")) { 
+            localStorage.clear(); 
+            location.reload(); 
+        } 
     };
 
     function deleteRun(id) { if (confirm("Delete?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id).onsuccess = renderHistory; } }
@@ -268,17 +323,6 @@
     document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value; localStorage.setItem('chan_run_loc', runLocation); location.reload(); };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('saveGoal').onclick = () => { localStorage.setItem('chan_target_km', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); };
-    
-    // UPDATED NEW RUN LOGIC: FULL RESET
-    document.getElementById('newRunBtn').onclick = () => { 
-        if(confirm("Start NEW run session? This will reset all current goals and history progress.")) { 
-            localStorage.clear(); 
-            sessionDistance = 0; totalDistance = 0; 
-            location.reload(); 
-        } 
-    };
-    
-    document.getElementById('startBtn').onclick = start;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
 </body>
