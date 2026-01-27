@@ -135,7 +135,7 @@
 
         <div class="button-row">
             <button class="btn btn-side" id="openHistory" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
-            <div class="new-run-circle" id="newRunBtn"><span class="text-new">NEW</span><span class="text-run">RUN</span></div>
+            <div class="new-run-circle" id="newRunBtn"><span class="text-new" style="font-size:0.5rem">NEW</span><span class="text-run" style="font-size:0.7rem">RUN</span></div>
             <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
         </div>
@@ -203,18 +203,12 @@
     }
 
     function start() {
-        // RESET SESSION LOGIC FOR NEW RUN
-        sessionDistance = 0; totalSeconds = 0; lastCoords = null; 
-        lastPointTime = Date.now(); lastSpokenDistance = 0;
-        timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
-        
-        speak("Running");
+        lastCoords = null; lastPointTime = Date.now(); speak("Running");
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            
-            // PACE CALCULATION: Active after 10 meters
-            if(sessionDistance > 0.01) {
+            // PACE GATE: Set to 30 meters to stabilize math
+            if(sessionDistance > 0.03) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
             }
@@ -222,7 +216,7 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            if (pos.coords.accuracy > 40) return; 
+            if (pos.coords.accuracy > 35) return; 
 
             if (lastCoords) {
                 const R = 6371;
@@ -232,8 +226,8 @@
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
 
-                // ADJUSTED IDLE BARRIER: 5m and 2.0km/h speed
-                if (d > 0.005 && speed > 2.0) { 
+                // STRICT IDLE BARRIER: Ignore if move < 10m OR speed < 3.0km/h
+                if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; updateProgress();
                     if (sessionDistance >= lastSpokenDistance + 0.5) {
                         lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
@@ -274,7 +268,16 @@
     document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value; localStorage.setItem('chan_run_loc', runLocation); location.reload(); };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('saveGoal').onclick = () => { localStorage.setItem('chan_target_km', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); };
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start NEW run session? Current display will reset.")) { sessionDistance = 0; timerEl.innerText = "00:00"; paceEl.innerText = "0'00\""; distEl.innerText = "0.00"; } };
+    
+    // UPDATED NEW RUN LOGIC: FULL RESET
+    document.getElementById('newRunBtn').onclick = () => { 
+        if(confirm("Start NEW run session? This will reset all current goals and history progress.")) { 
+            localStorage.clear(); 
+            sessionDistance = 0; totalDistance = 0; 
+            location.reload(); 
+        } 
+    };
+    
     document.getElementById('startBtn').onclick = start;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
