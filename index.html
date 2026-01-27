@@ -238,8 +238,8 @@
 
     function updateGpsIcon(accuracy) {
         gpsIcon.classList.remove('sig-good', 'sig-poor', 'sig-none');
-        if (accuracy < 30) gpsIcon.classList.add('sig-good');
-        else if (accuracy < 80) gpsIcon.classList.add('sig-poor');
+        if (accuracy < 25) gpsIcon.classList.add('sig-good');
+        else if (accuracy < 60) gpsIcon.classList.add('sig-poor');
         else gpsIcon.classList.add('sig-none');
     }
 
@@ -273,9 +273,18 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.01) {
+            
+            // Pace stability check: only calculate pace after moving 50 meters
+            if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                // Cap extreme drift pace at 25:00
+                if (totalMin < 25) {
+                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                } else {
+                    paceEl.innerText = "25'00\"+";
+                }
+            } else {
+                paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
@@ -283,7 +292,7 @@
             updateGpsIcon(pos.coords.accuracy);
             
             // 1. SIGNAL QUALITY FILTER (Only accept accurate points)
-            if (pos.coords.accuracy > 30) return; 
+            if (pos.coords.accuracy > 25) return; 
 
             if (lastCoords) {
                 const R = 6371; 
@@ -299,10 +308,10 @@
                 const timeDiffHours = (timeNow - lastPointTime) / 3600000;
                 const speed = d / timeDiffHours;
 
-                // 2. IDLE DRIFT FILTER (The Strava logic)
-                // - Ignore if distance moved is less than 5 meters
-                // - Ignore if speed is less than 2.5 km/h (sitting/standing jitter)
-                if (d > 0.005 && speed > 2.5) { 
+                // 2. IDLE DRIFT FILTER
+                // d > 0.01: Must move at least 10 meters between points
+                // speed > 3.0: Must be moving faster than 3km/h (prevents standing still jitter)
+                if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
