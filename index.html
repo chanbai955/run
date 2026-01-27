@@ -120,10 +120,6 @@
         .history-content { flex: 1; }
         .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 10px; }
         .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-        
-        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .history-tools { display: flex; align-items: center; gap: 15px; }
-        #downloadPDF { color: var(--accent-blue); cursor: pointer; font-size: 24px; }
     </style>
 </head>
 <body>
@@ -187,12 +183,9 @@
 
     <div id="historyModal" class="modal">
         <div class="quick-note">
-            <div class="history-header">
-                <h2 style="color:var(--neon-green); margin:0;">RUN NOTES</h2>
-                <div class="history-tools">
-                    <span id="downloadPDF" class="material-icons-round">picture_as_pdf</span>
-                    <span id="closeHistory" class="material-icons-round" style="cursor:pointer;">close</span>
-                </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <h2 style="color:var(--neon-green);">RUN NOTES</h2>
+                <span id="closeHistory" class="material-icons-round" style="cursor:pointer;">close</span>
             </div>
             <div id="lapList"></div>
             <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
@@ -205,8 +198,10 @@
     let targetDate = localStorage.getItem('chan_target_date') || "";
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
-    let lastSpokenDistance = 0, isPaused = false, lastPointTime = 0;
+    let lastSpokenDistance = 0;
     let db;
+    let isPaused = false;
+    let lastPointTime = 0;
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
@@ -222,6 +217,7 @@
 
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
+
     window.addEventListener('DOMContentLoaded', () => { updateProgress(); checkStatus(); locDisplay.innerText = runLocation; });
 
     function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
@@ -233,12 +229,25 @@
         if (targetGoal > 0) {
             balKm.innerText = Math.max(targetGoal - cur, 0).toFixed(2);
             progressBar.style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
+        } else {
+            balKm.innerText = "0.00";
+            progressBar.style.width = "0%";
         }
+        checkVoiceMilestones();
+    }
+
+    function updateGpsIcon(accuracy) {
+        gpsIcon.classList.remove('sig-good', 'sig-poor', 'sig-none');
+        if (accuracy < 30) gpsIcon.classList.add('sig-good');
+        else if (accuracy < 80) gpsIcon.classList.add('sig-poor');
+        else gpsIcon.classList.add('sig-none');
     }
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) {
-            balDateDisplay.innerText = "DUE: NOT SET"; daysLeftDisplay.innerText = ""; return;
+            balDateDisplay.innerText = "DUE: NOT SET";
+            daysLeftDisplay.innerText = "";
+            return;
         }
         const due = new Date(targetDate).setHours(0,0,0,0);
         const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
@@ -249,34 +258,32 @@
     function checkVoiceMilestones() {
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            speak(`${lastSpokenDistance} kilometers. Pace is ${paceEl.innerText}`);
+            let msg = lastSpokenDistance % 1 === 0 ? `${lastSpokenDistance} km. Pace ${paceEl.innerText}` : `${lastSpokenDistance} km`;
+            speak(msg);
         }
     }
 
     function start() {
-        speak(isPaused ? "Resuming" : "Running");
-        isPaused = false; lastCoords = null; lastPointTime = Date.now();
+        if (isPaused) speak("Resuming");
+        else speak("Running");
+        isPaused = false;
+        lastCoords = null;
+        lastPointTime = Date.now();
         
         timerInterval = setInterval(() => {
             totalSeconds++;
-            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${((totalSeconds%60)).toString().padStart(2,'0')}`;
-            
-            // SMOOTH PACE CALCULATION
-            if(sessionDistance > 0.002) {
+            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
+            if(sessionDistance > 0.01) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                if (totalMin < 40) { // If pace is faster than 40 min/km (meaning you are actually moving)
-                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
-                }
-            } else {
-                paceEl.innerText = "0'00\"";
+                paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            const acc = pos.coords.accuracy;
-            gpsIcon.className = 'material-icons-round ' + (acc < 30 ? 'sig-good' : acc < 70 ? 'sig-poor' : 'sig-none');
+            updateGpsIcon(pos.coords.accuracy);
             
-            if (acc > 55) return; 
+            // 1. SIGNAL QUALITY FILTER (Only accept accurate points)
+            if (pos.coords.accuracy > 30) return; 
 
             if (lastCoords) {
                 const R = 6371; 
@@ -289,22 +296,23 @@
                 const d = R * c;
 
                 const timeNow = Date.now();
-                const hours = (timeNow - lastPointTime) / 3600000;
-                const speed = d / hours;
+                const timeDiffHours = (timeNow - lastPointTime) / 3600000;
+                const speed = d / timeDiffHours;
 
-                // Threshold: Capture any movement over 1.2km/h (walking)
-                if (d > 0.003 && speed > 1.2 && speed < 35) { 
+                // 2. IDLE DRIFT FILTER (The Strava logic)
+                // - Ignore if distance moved is less than 5 meters
+                // - Ignore if speed is less than 2.5 km/h (sitting/standing jitter)
+                if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
                     lastPointTime = timeNow;
-                    checkVoiceMilestones();
                 }
             } else {
                 lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
                 lastPointTime = Date.now();
             }
-        }, (err) => console.warn(err), {enableHighAccuracy: true, timeout: 8000, maximumAge: 0});
+        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
         
         setUI('running');
     }
@@ -323,8 +331,12 @@
     startBtn.onclick = () => { 
         if (!watchID) start(); 
         else { 
-            clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); 
-            watchID = null; isPaused = true; setUI('paused'); speak("Paused");
+            clearInterval(timerInterval); 
+            navigator.geolocation.clearWatch(watchID); 
+            watchID = null; 
+            isPaused = true;
+            setUI('paused'); 
+            speak("Paused");
         } 
     };
     
@@ -333,20 +345,18 @@
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
-        tx.objectStore("runs").add({ 
-            date: document.getElementById('fullDate').innerText, 
-            distance: sessionDistance.toFixed(2), 
-            pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation 
-        });
-        isPaused = false; setUI('stopped'); speak("Finished and Saved");
+        tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
+        isPaused = false;
+        setUI('stopped'); speak("Finished and Saved");
     };
 
     newRunBtn.onclick = () => {
         if (confirm("Reset ALL progress and targets?")) {
             sessionDistance = 0; totalDistance = 0; targetGoal = 0; targetDate = ""; 
-            totalSeconds = 0; lastSpokenDistance = 0;
+            totalSeconds = 0; lastSpokenDistance = 0; isPaused = false;
             localStorage.setItem('chan_accumulated_km', 0);
-            localStorage.removeItem('chan_target_km'); localStorage.removeItem('chan_target_date'); 
+            localStorage.removeItem('chan_target_km');
+            localStorage.removeItem('chan_target_date'); 
             updateProgress(); checkStatus(); 
             timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
             setUI('paused');
@@ -354,18 +364,24 @@
     };
 
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
-    document.getElementById('saveLoc').onclick = () => { 
-        runLocation = document.getElementById('locInput').value || "NOT SET"; 
-        localStorage.setItem('chan_run_loc', runLocation); 
-        locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; 
-    };
+    document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value || "NOT SET"; localStorage.setItem('chan_run_loc', runLocation); locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('saveGoal').onclick = () => { 
         targetGoal = parseFloat(document.getElementById('goalInput').value) || 0; 
         targetDate = document.getElementById('dateInput').value;
-        localStorage.setItem('chan_target_km', targetGoal); localStorage.setItem('chan_target_date', targetDate);
-        updateProgress(); checkStatus(); document.getElementById('goalModal').style.display = 'none'; 
+        localStorage.setItem('chan_target_km', targetGoal); 
+        localStorage.setItem('chan_target_date', targetDate);
+        updateProgress(); checkStatus();
+        document.getElementById('goalModal').style.display = 'none'; 
     };
+
+    function deleteRun(id) {
+        if (confirm("Delete this run entry?")) {
+            const tx = db.transaction("runs", "readwrite");
+            tx.objectStore("runs").delete(id);
+            tx.oncomplete = () => renderHistory();
+        }
+    }
 
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
@@ -375,41 +391,24 @@
             req.result.reverse().forEach(run => {
                 const row = document.createElement('div');
                 row.className = "history-item";
-                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div>
-                    <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>`;
+                row.innerHTML = `
+                    <div class="history-content">
+                        <strong>${run.date}</strong><br>
+                        ${run.distance} KM | ${run.duration} | ${run.pace}<br>
+                        <small>${run.location}</small>
+                    </div>
+                    <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>
+                `;
                 list.appendChild(row);
             });
         };
     }
 
-    function deleteRun(id) { if (confirm("Delete this run?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id); tx.oncomplete = () => renderHistory(); } }
-
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
-    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    const closeHistoryFn = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('closeHistory').onclick = closeHistoryFn;
+    document.getElementById('bottomCloseHistory').onclick = closeHistoryFn;
     document.getElementById('resetBtn').onclick = () => location.reload();
-
-    document.getElementById('downloadPDF').onclick = function() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        let y = 20;
-        doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHAN'S RUN PRO REPORT", 20, y);
-        doc.setFontSize(10); doc.setTextColor(100); doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, y + 10);
-        doc.line(20, y + 15, 190, y + 15); y += 25;
-
-        const tx = db.transaction("runs", "readonly");
-        tx.objectStore("runs").getAll().onsuccess = (e) => {
-            e.target.result.reverse().forEach(run => {
-                if (y > 270) { doc.addPage(); y = 20; }
-                doc.setFontSize(12); doc.setTextColor(0); doc.setFont(undefined, 'bold');
-                doc.text(`${run.date} - ${run.location}`, 20, y);
-                doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(60);
-                doc.text(`Dist: ${run.distance} km | Time: ${run.duration} | Pace: ${run.pace}`, 20, y + 7);
-                doc.setDrawColor(230); doc.line(20, y + 12, 190, y + 12); y += 20;
-            });
-            doc.save(`Run_Report_${new Date().toISOString().slice(0,10)}.pdf`);
-        };
-    };
 </script>
 </body>
 </html>
