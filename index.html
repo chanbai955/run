@@ -72,7 +72,6 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
@@ -204,29 +203,35 @@
     }
 
     function start() {
-        lastCoords = null; lastPointTime = Date.now(); speak("Running");
+        lastCoords = null; lastPointTime = Date.now(); speak("Running started");
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+            } else {
+                paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            if (pos.coords.accuracy > 35) return; // 1. STRICT ACCURACY GATE
+            
+            // 1. ACCURACY GATE: Ignore if accuracy is poor (over 30m error)
+            if (pos.coords.accuracy > 30) return; 
 
             if (lastCoords) {
                 const R = 6371;
+                const lat1 = lastCoords.lat * Math.PI/180;
+                const lat2 = pos.coords.latitude * Math.PI/180;
                 const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(pos.coords.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
 
-                // 2. IDLE BARRIER: Ignore if move < 10m OR speed < 3.0km/h
+                // 2. IDLE LOCK: Ignore if distance moved is < 10 meters OR speed is < 3.0km/h
                 if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; updateProgress();
                     if (sessionDistance >= lastSpokenDistance + 0.5) {
@@ -236,7 +241,7 @@
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now();
                 }
             } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
-        }, null, {enableHighAccuracy: true});
+        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
         startBtn.classList.add('hidden'); stopBtn.classList.remove('hidden');
     }
 
@@ -245,7 +250,7 @@
         totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
-        speak("Finished"); location.reload();
+        speak("Run finished"); location.reload();
     };
 
     function deleteRun(id) { if (confirm("Delete?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id).onsuccess = renderHistory; } }
