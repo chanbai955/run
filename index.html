@@ -72,6 +72,7 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
+        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
@@ -82,8 +83,19 @@
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
         .input-box { background: #fff; border-radius: 15px; margin-bottom: 15px; }
-        .modal-card input { width: 90%; padding: 15px; border: none; font-size: 1.2rem; font-weight: 700; outline: none; }
-        .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; }
+        .modal-card input { width: 90%; padding: 15px; border: none; font-size: 1.2rem; font-weight: 700; outline: none; color: #000; }
+        /* Style for date input specifically to show placeholder when empty */
+        .modal-card input[type="date"]::before {
+            content: attr(placeholder);
+            width: 100%;
+            color: #666;
+        }
+        .modal-card input[type="date"]:focus::before,
+        .modal-card input[type="date"]:valid::before {
+            content: "";
+            display: none;
+        }
+        .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
@@ -154,8 +166,8 @@
         </div>
     </div>
 
-    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
-    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput"></div><div class="input-box"><input type="date" id="dateInput"></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
+    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput" placeholder="Enter Location"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
+    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="Enter KM"></div><div class="input-box"><input type="date" id="dateInput" placeholder="Select Date" required></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
 
 <script>
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
@@ -219,11 +231,8 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            
-            // STABLE PACE CALCULATION: Active after 50 meters
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                // Only show pace if moving at a reasonable speed (prevents massive drift pace)
                 if (totalMin < 30) {
                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
                 } else {
@@ -236,8 +245,6 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            
-            // 1. SIGNAL QUALITY LOCK: Discard any point with error > 30m
             if (pos.coords.accuracy > 30) return; 
 
             if (lastCoords) {
@@ -250,8 +257,6 @@
                 const timeDiff = (Date.now() - lastPointTime) / 3600000;
                 const speed = d / timeDiff;
 
-                // 2. MOVEMENT BARRIER: Ignore if move < 10m OR speed < 3.0km/h
-                // This stops the app from counting "table drift" while phone is idle.
                 if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; 
                     updateProgress();
