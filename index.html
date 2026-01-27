@@ -123,7 +123,7 @@
         
         .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .history-tools { display: flex; align-items: center; gap: 15px; }
-        #downloadPDF { color: var(--accent-blue); cursor: pointer; }
+        #downloadPDF { color: var(--accent-blue); cursor: pointer; font-size: 24px; }
     </style>
 </head>
 <body>
@@ -208,7 +208,6 @@
     let lastSpokenDistance = 0, isPaused = false, lastPointTime = 0;
     let db;
 
-    // Database Initialization
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
     dbReq.onsuccess = (e) => db = e.target.result;
@@ -221,7 +220,6 @@
           balDateDisplay = document.getElementById('balDateDisplay'), daysLeftDisplay = document.getElementById('daysLeftDisplay'),
           gpsIcon = document.getElementById('gpsIcon');
 
-    // UI Updates
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
     window.addEventListener('DOMContentLoaded', () => { updateProgress(); checkStatus(); locDisplay.innerText = runLocation; });
@@ -236,7 +234,6 @@
             balKm.innerText = Math.max(targetGoal - cur, 0).toFixed(2);
             progressBar.style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
         }
-        checkVoiceMilestones();
     }
 
     function checkStatus() {
@@ -252,11 +249,10 @@
     function checkVoiceMilestones() {
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            speak(`${lastSpokenDistance} km. Pace ${paceEl.innerText}`);
+            speak(`${lastSpokenDistance} kilometers. Pace is ${paceEl.innerText}`);
         }
     }
 
-    // CORE KM TRACKER LOGIC (RESTORED)
     function start() {
         speak(isPaused ? "Resuming" : "Running");
         isPaused = false; lastCoords = null; lastPointTime = Date.now();
@@ -264,17 +260,18 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.01) {
+            if(sessionDistance > 0.005) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
             }
         }, 1000);
 
+        // RESTORED TRACKING LOGIC
         watchID = navigator.geolocation.watchPosition(pos => {
             const acc = pos.coords.accuracy;
-            gpsIcon.className = 'material-icons-round ' + (acc < 20 ? 'sig-good' : acc < 50 ? 'sig-poor' : 'sig-none');
+            gpsIcon.className = 'material-icons-round ' + (acc < 25 ? 'sig-good' : acc < 65 ? 'sig-poor' : 'sig-none');
             
-            if (acc > 25) return; // Ignore poor signal
+            if (acc > 50) return; // Ignore very poor signal
 
             if (lastCoords) {
                 const R = 6371; 
@@ -287,20 +284,22 @@
                 const d = R * c;
 
                 const timeNow = Date.now();
-                const speed = d / ((timeNow - lastPointTime) / 3600000);
+                const hours = (timeNow - lastPointTime) / 3600000;
+                const speed = d / hours;
 
-                // Movement filters: d > 10m AND 3.5km/h < speed < 30km/h
-                if (d > 0.01 && speed > 3.5 && speed < 30) { 
+                // Restored Thresholds: capture slow walk (1.5km/h) but filter stationary jitter
+                if (d > 0.005 && speed > 1.5 && speed < 35) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
                     lastPointTime = timeNow;
+                    checkVoiceMilestones();
                 }
             } else {
                 lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
                 lastPointTime = Date.now();
             }
-        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
+        }, (err) => console.warn(err), {enableHighAccuracy: true, timeout: 8000, maximumAge: 0});
         
         setUI('running');
     }
@@ -385,7 +384,6 @@
     document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('resetBtn').onclick = () => location.reload();
 
-    // PDF EXPORT
     document.getElementById('downloadPDF').onclick = function() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -404,7 +402,7 @@
                 doc.text(`Dist: ${run.distance} km | Time: ${run.duration} | Pace: ${run.pace}`, 20, y + 7);
                 doc.setDrawColor(230); doc.line(20, y + 12, 190, y + 12); y += 20;
             });
-            doc.save("Run_History.pdf");
+            doc.save(`Run_Report_${new Date().toISOString().slice(0,10)}.pdf`);
         };
     };
 </script>
