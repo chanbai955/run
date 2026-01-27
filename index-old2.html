@@ -27,6 +27,7 @@
             overflow: hidden;
         }
 
+        /* UI ELEMENTS */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 1.1rem; font-weight: 900; }
@@ -69,11 +70,8 @@
         #balDateDisplay { color: #888; }
         #daysLeftDisplay { color: var(--accent-blue); }
 
-        .location-section { width: 90%; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .location-section { width: 90%; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         #locDisplay { font-size: 0.8rem; color: var(--accent-blue); font-weight: 800; text-transform: uppercase; }
-
-        /* DEBUG ACCURACY STYLE */
-        .accuracy-box { font-size: 0.6rem; font-weight: 900; letter-spacing: 1px; margin-bottom: 15px; opacity: 0.8; }
 
         .new-run-circle {
             width: 55px;
@@ -102,19 +100,53 @@
         .hidden { display: none !important; }
 
         /* MODALS */
+        .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
+        .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
+        .input-group-container-vertical { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; width: 100%; }
+        .input-box { background: #fff; border-radius: 15px; border: 1px solid #444; overflow: hidden; display: flex; }
+        .modal-card input { width: 100%; padding: 15px !important; border: none !important; background: transparent !important; color: #000 !important; font-size: 1.2rem !important; font-weight: 700; outline: none; }
+        .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); color: #000; border: none; border-radius: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
-        .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
-        .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        
+        /* STICKY HEADER LOGIC */
+        .quick-note { 
+            background: var(--card-bg); 
+            width: 100%; 
+            border-radius: 30px 30px 0 0; 
+            max-height: 85vh; 
+            overflow-y: auto; 
+            position: relative;
+        }
+        
+        .sticky-history-header {
+            position: sticky;
+            top: 0;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            padding: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
         .history-list-container { padding: 15px 25px 120px 25px; }
-        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
+
+        .history-item { 
+            background: #2c2c2e; 
+            margin-bottom: 12px; 
+            padding: 15px; 
+            border-radius: 15px; 
+            border-left: 4px solid var(--accent-blue);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
         .history-content { flex: 1; }
         .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 10px; }
         .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
-        .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
-        .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
-        .input-box { background: #fff; border-radius: 15px; border: 1px solid #444; overflow: hidden; display: flex; margin-bottom: 15px; }
-        .modal-card input { width: 100%; padding: 15px; border: none; background: transparent; color: #000; font-size: 1.2rem; font-weight: 700; outline: none; }
-        .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); color: #000; border: none; border-radius: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -165,8 +197,6 @@
             <span id="locDisplay">NOT SET</span>
         </div>
 
-        <div id="accDisplay" class="accuracy-box">GPS SEARCHING...</div>
-
         <div class="button-row">
             <button class="btn btn-side" id="openHistory" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
             <div class="new-run-circle" id="newRunBtn"><span class="text-new">NEW</span><span class="text-run">RUN</span></div>
@@ -175,8 +205,8 @@
         </div>
     </div>
 
-    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput" placeholder="Route/Park"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
-    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div><div class="input-box"><input type="date" id="dateInput"></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
+    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-group-container-vertical"><div class="input-box"><input type="text" id="locInput" placeholder="Route/Park"></div></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
+    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-group-container-vertical"><div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div><div class="input-box"><input type="date" id="dateInput"></div></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
 
     <div id="historyModal" class="modal">
         <div class="quick-note">
@@ -214,7 +244,8 @@
           stopBtn = document.getElementById('stopBtn'), newRunBtn = document.getElementById('newRunBtn'),
           progressBar = document.getElementById('progressBar'), doneKm = document.getElementById('doneKm'),
           balKm = document.getElementById('balKm'), locDisplay = document.getElementById('locDisplay'),
-          accDisplay = document.getElementById('accDisplay'), gpsIcon = document.getElementById('gpsIcon');
+          balDateDisplay = document.getElementById('balDateDisplay'), daysLeftDisplay = document.getElementById('daysLeftDisplay'),
+          gpsIcon = document.getElementById('gpsIcon');
 
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
@@ -239,33 +270,21 @@
 
     function updateGpsIcon(accuracy) {
         gpsIcon.classList.remove('sig-good', 'sig-poor', 'sig-none');
-        accDisplay.style.color = "white";
-        
-        if (accuracy < 25) {
-            gpsIcon.classList.add('sig-good');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (EXCELLENT)`;
-            accDisplay.style.color = "var(--accent-blue)";
-        } else if (accuracy < 65) {
-            gpsIcon.classList.add('sig-poor');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (OK)`;
-            accDisplay.style.color = "var(--warning-yellow)";
-        } else {
-            gpsIcon.classList.add('sig-none');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (POOR - FILTERING)`;
-            accDisplay.style.color = "var(--danger-red)";
-        }
+        if (accuracy < 25) gpsIcon.classList.add('sig-good');
+        else if (accuracy < 60) gpsIcon.classList.add('sig-poor');
+        else gpsIcon.classList.add('sig-none');
     }
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) {
-            document.getElementById('balDateDisplay').innerText = "DUE: NOT SET";
-            document.getElementById('daysLeftDisplay').innerText = "";
+            balDateDisplay.innerText = "DUE: NOT SET";
+            daysLeftDisplay.innerText = "";
             return;
         }
         const due = new Date(targetDate).setHours(0,0,0,0);
         const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
-        document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
-        document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE!" : `${diffDays} DAYS LEFT`;
+        balDateDisplay.innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
+        daysLeftDisplay.innerText = diffDays < 0 ? "OVERDUE!" : `${diffDays} DAYS LEFT`;
     }
 
     function checkVoiceMilestones() {
@@ -288,7 +307,11 @@
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                paceEl.innerText = totalMin < 30 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "30'00\"+";
+                if (totalMin < 25) {
+                    paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
+                } else {
+                    paceEl.innerText = "25'00\"+";
+                }
             } else {
                 paceEl.innerText = "0'00\"";
             }
@@ -296,9 +319,7 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            
-            // STRICT FILTER FOR ACCURACY
-            if (pos.coords.accuracy > 65) return; 
+            if (pos.coords.accuracy > 25) return; 
 
             if (lastCoords) {
                 const R = 6371; 
@@ -311,10 +332,10 @@
                 const d = R * c;
 
                 const timeNow = Date.now();
-                const speed = d / ((timeNow - lastPointTime) / 3600000);
+                const timeDiffHours = (timeNow - lastPointTime) / 3600000;
+                const speed = d / timeDiffHours;
 
-                // MOVEMENT FILTER (5m distance + 1.5km/h speed)
-                if (d > 0.005 && speed > 1.5) { 
+                if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
@@ -324,7 +345,7 @@
                 lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
                 lastPointTime = Date.now();
             }
-        }, err => console.warn(err), {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
+        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
         
         setUI('running');
     }
@@ -340,26 +361,60 @@
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; isPaused = true; setUI('paused'); speak("Paused"); } };
+    startBtn.onclick = () => { 
+        if (!watchID) start(); 
+        else { 
+            clearInterval(timerInterval); 
+            navigator.geolocation.clearWatch(watchID); 
+            watchID = null; 
+            isPaused = true;
+            setUI('paused'); 
+            speak("Paused");
+        } 
+    };
+    
     stopBtn.onclick = () => { 
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID);
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
-        setUI('stopped'); speak("Finished");
+        isPaused = false;
+        setUI('stopped'); speak("Finished and Saved");
     };
 
-    newRunBtn.onclick = () => { if (confirm("Reset everything?")) { sessionDistance = 0; totalDistance = 0; localStorage.setItem('chan_accumulated_km', 0); location.reload(); } };
+    newRunBtn.onclick = () => {
+        if (confirm("Reset ALL progress and targets?")) {
+            sessionDistance = 0; totalDistance = 0; targetGoal = 0; targetDate = ""; 
+            totalSeconds = 0; lastSpokenDistance = 0; isPaused = false;
+            localStorage.setItem('chan_accumulated_km', 0);
+            localStorage.removeItem('chan_target_km');
+            localStorage.removeItem('chan_target_date'); 
+            updateProgress(); checkStatus(); 
+            timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
+            setUI('paused');
+        }
+    };
+
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
     document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value || "NOT SET"; localStorage.setItem('chan_run_loc', runLocation); locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('saveGoal').onclick = () => { 
         targetGoal = parseFloat(document.getElementById('goalInput').value) || 0; 
         targetDate = document.getElementById('dateInput').value;
-        localStorage.setItem('chan_target_km', targetGoal); localStorage.setItem('chan_target_date', targetDate);
-        updateProgress(); checkStatus(); document.getElementById('goalModal').style.display = 'none'; 
+        localStorage.setItem('chan_target_km', targetGoal); 
+        localStorage.setItem('chan_target_date', targetDate);
+        updateProgress(); checkStatus();
+        document.getElementById('goalModal').style.display = 'none'; 
     };
+
+    function deleteRun(id) {
+        if (confirm("Delete this run entry?")) {
+            const tx = db.transaction("runs", "readwrite");
+            tx.objectStore("runs").delete(id);
+            tx.oncomplete = () => renderHistory();
+        }
+    }
 
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
@@ -367,8 +422,16 @@
         req.onsuccess = () => {
             const list = document.getElementById('lapList'); list.innerHTML = "";
             req.result.reverse().forEach(run => {
-                const row = document.createElement('div'); row.className = "history-item";
-                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div>`;
+                const row = document.createElement('div');
+                row.className = "history-item";
+                row.innerHTML = `
+                    <div class="history-content">
+                        <strong>${run.date}</strong><br>
+                        ${run.distance} KM | ${run.duration} | ${run.pace}<br>
+                        <small>${run.location}</small>
+                    </div>
+                    <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>
+                `;
                 list.appendChild(row);
             });
         };
@@ -379,19 +442,72 @@
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
             const runs = req.result;
+            if(runs.length === 0) { alert("No run history to export."); return; }
+            
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
-            doc.setFontSize(10); doc.setTextColor(0); doc.text(`Total Lifetime Distance: ${totalDistance.toFixed(2)} KM`, 14, 35);
-            const tableData = [...runs].reverse().map(run => [run.date, run.distance + " KM", run.duration, run.pace, run.location]);
-            doc.autoTable({ startY: 45, head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']], body: tableData, headStyles: { fillColor: [50, 215, 75] } });
-            doc.save(`Chan_Runs.pdf`);
+            const accent = [50, 215, 75]; 
+            
+            doc.setFontSize(22);
+            doc.setTextColor(...accent);
+            doc.text("CHAN'S RUN PRO", 14, 20);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text("PERFORMANCE TRACKING REPORT", 14, 26);
+            
+            const maxDist = Math.max(...runs.map(r => parseFloat(r.distance)));
+            doc.setDrawColor(...accent);
+            doc.setLineWidth(0.5);
+            doc.rect(14, 32, 180, 25);
+            doc.setFontSize(10);
+            doc.setTextColor(0);
+            doc.text(`Total Runs: ${runs.length}`, 20, 40);
+            doc.text(`Lifetime KM: ${totalDistance.toFixed(2)} KM`, 20, 48);
+            doc.text(`Personal Best: ${maxDist.toFixed(2)} KM`, 100, 40);
+            doc.text(`Report Date: ${new Date().toLocaleDateString()}`, 100, 48);
+
+            doc.setFontSize(12);
+            doc.text("RECENT PROGRESS (KM)", 14, 70);
+            const chartRuns = runs.slice(-10);
+            const chartX = 30;
+            const chartY = 110;
+            const barWidth = 10;
+            const chartHeight = 30;
+
+            chartRuns.forEach((run, i) => {
+                const val = parseFloat(run.distance);
+                const h = (val / (maxDist || 1)) * chartHeight;
+                doc.setFillColor(...accent);
+                doc.rect(chartX + (i * 15), chartY - h, barWidth, h, 'F');
+                doc.setFontSize(6);
+                doc.text(run.date.split('/')[0], chartX + (i * 15) + 2, chartY + 5);
+            });
+
+            const tableData = [...runs].reverse().map(run => [
+                run.date,
+                run.distance + " KM",
+                run.duration,
+                run.pace,
+                run.location
+            ]);
+
+            doc.autoTable({
+                startY: 125,
+                head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
+                body: tableData,
+                headStyles: { fillColor: accent, textColor: [0, 0, 0], fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                margin: { top: 10 }
+            });
+
+            doc.save(`Chan_Run_Report_${new Date().getTime()}.pdf`);
         };
     };
 
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
-    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    const closeHistoryFn = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('closeHistory').onclick = closeHistoryFn;
+    document.getElementById('bottomCloseHistory').onclick = closeHistoryFn;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
 </body>
