@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Chan's Run Pro</title>
+    <title>Run Tracker</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -27,6 +27,7 @@
             overflow: hidden;
         }
 
+        /* HEADER & UI */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 1.1rem; font-weight: 900; }
@@ -69,31 +70,23 @@
         #balDateDisplay { color: #888; }
         #daysLeftDisplay { color: var(--accent-blue); }
 
-        .location-section { width: 90%; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .location-section { width: 90%; display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
         #locDisplay { font-size: 0.8rem; color: var(--accent-blue); font-weight: 800; text-transform: uppercase; }
 
-        /* DEBUG ACCURACY STYLE */
         .accuracy-box { font-size: 0.6rem; font-weight: 900; letter-spacing: 1px; margin-bottom: 15px; opacity: 0.8; }
 
+        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .new-run-circle {
-            width: 55px;
-            height: 55px;
+            width: 55px; height: 55px;
             background: linear-gradient(145deg, #1b5e20, #32D74B);
-            border: 2px solid #555;
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            transition: 0.1s;
+            border: 2px solid #555; border-radius: 50%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
         .new-run-circle span { color: white; font-weight: 900; line-height: 1; pointer-events: none; }
         .text-new { font-size: 0.55rem; }
         .text-run { font-size: 0.8rem; }
 
-        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
         .btn-main { width: 85px; height: 85px; }
         .btn-side { width: 50px; height: 50px; background: #2c2c2e; color: #fff; }
@@ -101,14 +94,45 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS */
+        /* MODALS & CHART */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
-        .history-list-container { padding: 15px 25px 120px 25px; }
-        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
+        
+        .chart-container { 
+            padding: 20px; 
+            background: #121212; 
+            margin: 15px 25px; 
+            border-radius: 15px; 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: space-between; 
+            height: 100px;
+            border: 1px solid #333;
+        }
+        .chart-bar { 
+            width: 8%; 
+            background: var(--neon-green); 
+            border-radius: 4px 4px 0 0; 
+            min-height: 5px; 
+            position: relative;
+            transition: height 0.5s ease;
+        }
+        .chart-bar:hover::after {
+            content: attr(data-val);
+            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            font-size: 0.6rem; color: var(--neon-green); font-weight: bold;
+        }
+
+        .history-list-container { padding: 0 25px 120px 25px; }
+        .history-item { 
+            background: #2c2c2e; margin-bottom: 12px; padding: 15px; 
+            border-radius: 15px; border-left: 4px solid var(--accent-blue);
+            display: flex; justify-content: space-between; align-items: center;
+        }
         .history-content { flex: 1; }
-        .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 10px; }
+        .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 15px; }
+        
         .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
@@ -175,9 +199,6 @@
         </div>
     </div>
 
-    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput" placeholder="Route/Park"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
-    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div><div class="input-box"><input type="date" id="dateInput"></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
-
     <div id="historyModal" class="modal">
         <div class="quick-note">
             <div class="sticky-history-header">
@@ -187,6 +208,8 @@
                     <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
                 </div>
             </div>
+            <div class="chart-container" id="runChart"></div>
+            
             <div class="history-list-container">
                 <div id="lapList"></div>
                 <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
@@ -194,16 +217,16 @@
         </div>
     </div>
 
+    <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput" placeholder="Route/Park"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
+    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div><div class="input-box"><input type="date" id="dateInput"></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
+
 <script>
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null;
-    let lastSpokenDistance = 0;
-    let db;
-    let isPaused = false;
-    let lastPointTime = 0;
+    let lastSpokenDistance = 0, db, isPaused = false, lastPointTime = 0;
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
@@ -231,37 +254,20 @@
             balKm.innerText = Math.max(targetGoal - cur, 0).toFixed(2);
             progressBar.style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
         } else {
-            balKm.innerText = "0.00";
-            progressBar.style.width = "0%";
+            balKm.innerText = "0.00"; progressBar.style.width = "0%";
         }
         checkVoiceMilestones();
     }
 
     function updateGpsIcon(accuracy) {
         gpsIcon.classList.remove('sig-good', 'sig-poor', 'sig-none');
-        accDisplay.style.color = "white";
-        
-        if (accuracy < 25) {
-            gpsIcon.classList.add('sig-good');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (EXCELLENT)`;
-            accDisplay.style.color = "var(--accent-blue)";
-        } else if (accuracy < 65) {
-            gpsIcon.classList.add('sig-poor');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (OK)`;
-            accDisplay.style.color = "var(--warning-yellow)";
-        } else {
-            gpsIcon.classList.add('sig-none');
-            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (POOR - FILTERING)`;
-            accDisplay.style.color = "var(--danger-red)";
-        }
+        if (accuracy < 25) { gpsIcon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (EXCELLENT)`; accDisplay.style.color = "var(--accent-blue)"; }
+        else if (accuracy < 65) { gpsIcon.classList.add('sig-poor'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (OK)`; accDisplay.style.color = "var(--warning-yellow)"; }
+        else { gpsIcon.classList.add('sig-none'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (POOR - FILTERING)`; accDisplay.style.color = "var(--danger-red)"; }
     }
 
     function checkStatus() {
-        if (!targetDate || targetGoal <= 0) {
-            document.getElementById('balDateDisplay').innerText = "DUE: NOT SET";
-            document.getElementById('daysLeftDisplay').innerText = "";
-            return;
-        }
+        if (!targetDate || targetGoal <= 0) return;
         const due = new Date(targetDate).setHours(0,0,0,0);
         const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
         document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
@@ -271,124 +277,104 @@
     function checkVoiceMilestones() {
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            let msg = lastSpokenDistance % 1 === 0 ? `${lastSpokenDistance} km. Pace ${paceEl.innerText}` : `${lastSpokenDistance} km`;
-            speak(msg);
+            speak(lastSpokenDistance % 1 === 0 ? `${lastSpokenDistance} km. Pace ${paceEl.innerText}` : `${lastSpokenDistance} km`);
         }
     }
 
     function start() {
-        if (isPaused) speak("Resuming");
-        else speak("Running");
-        isPaused = false;
-        lastCoords = null;
-        lastPointTime = Date.now();
-        
+        isPaused = false; lastCoords = null; lastPointTime = Date.now(); speak("Running");
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = totalMin < 30 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "30'00\"+";
-            } else {
-                paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            
-            // STRICT FILTER FOR ACCURACY
             if (pos.coords.accuracy > 65) return; 
-
             if (lastCoords) {
-                const R = 6371; 
-                const lat1 = lastCoords.lat * Math.PI/180;
-                const lat2 = pos.coords.latitude * Math.PI/180;
-                const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
-                const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
+                const R = 6371; const lat1 = lastCoords.lat * Math.PI/180; const lat2 = pos.coords.latitude * Math.PI/180;
+                const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180; const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                const d = R * c;
-
-                const timeNow = Date.now();
-                const speed = d / ((timeNow - lastPointTime) / 3600000);
-
-                // MOVEMENT FILTER (5m distance + 1.5km/h speed)
-                if (d > 0.005 && speed > 1.5) { 
-                    sessionDistance += d; 
-                    updateProgress(); 
-                    lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-                    lastPointTime = timeNow;
-                }
-            } else {
-                lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-                lastPointTime = Date.now();
-            }
-        }, err => console.warn(err), {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
-        
+                const d = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                const speed = d / ((Date.now() - lastPointTime) / 3600000);
+                if (d > 0.005 && speed > 1.5) { sessionDistance += d; updateProgress(); lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
+            } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
+        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
         setUI('running');
     }
 
     function setUI(state) {
-        if(state === 'running') {
-            startBtn.classList.remove('hidden'); stopBtn.classList.add('hidden');
-            newRunBtn.classList.add('hidden'); document.getElementById('startIcon').innerText = 'pause';
-        } else {
-            startBtn.classList.remove('hidden'); stopBtn.classList.remove('hidden');
-            newRunBtn.classList.remove('hidden'); document.getElementById('startIcon').innerText = 'play_arrow';
-            if (state === 'stopped') { startBtn.classList.add('hidden'); stopBtn.classList.add('hidden'); }
-        }
+        if(state === 'running') { startBtn.classList.remove('hidden'); stopBtn.classList.add('hidden'); newRunBtn.classList.add('hidden'); document.getElementById('startIcon').innerText = 'pause'; }
+        else { startBtn.classList.remove('hidden'); stopBtn.classList.remove('hidden'); newRunBtn.classList.remove('hidden'); document.getElementById('startIcon').innerText = 'play_arrow'; if (state === 'stopped') { startBtn.classList.add('hidden'); stopBtn.classList.add('hidden'); } }
     }
 
     startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; isPaused = true; setUI('paused'); speak("Paused"); } };
     stopBtn.onclick = () => { 
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID);
-        totalDistance += sessionDistance;
-        localStorage.setItem('chan_accumulated_km', totalDistance);
+        totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
         setUI('stopped'); speak("Finished");
     };
 
-    newRunBtn.onclick = () => { if (confirm("Reset everything?")) { sessionDistance = 0; totalDistance = 0; localStorage.setItem('chan_accumulated_km', 0); location.reload(); } };
-    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
-    document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value || "NOT SET"; localStorage.setItem('chan_run_loc', runLocation); locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; };
-    document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
-    document.getElementById('saveGoal').onclick = () => { 
-        targetGoal = parseFloat(document.getElementById('goalInput').value) || 0; 
-        targetDate = document.getElementById('dateInput').value;
-        localStorage.setItem('chan_target_km', targetGoal); localStorage.setItem('chan_target_date', targetDate);
-        updateProgress(); checkStatus(); document.getElementById('goalModal').style.display = 'none'; 
-    };
+    function deleteRun(id) {
+        if (confirm("Delete this run?")) {
+            const tx = db.transaction("runs", "readwrite");
+            tx.objectStore("runs").delete(id);
+            tx.oncomplete = () => renderHistory();
+        }
+    }
 
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
+            const runs = req.result;
             const list = document.getElementById('lapList'); list.innerHTML = "";
-            req.result.reverse().forEach(run => {
+            const chart = document.getElementById('runChart'); chart.innerHTML = "";
+            
+            // Build Chart (Last 10 runs)
+            const recentRuns = runs.slice(-10);
+            const maxDist = Math.max(...recentRuns.map(r => parseFloat(r.distance))) || 1;
+            recentRuns.forEach(run => {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
+                bar.setAttribute('data-val', `${run.distance}km`);
+                chart.appendChild(bar);
+            });
+
+            // Build History List
+            runs.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
-                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div>`;
+                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div>
+                                 <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>`;
                 list.appendChild(row);
             });
         };
     }
 
+    newRunBtn.onclick = () => { if (confirm("Reset everything?")) { sessionDistance = 0; totalDistance = 0; localStorage.clear(); location.reload(); } };
+    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
+    document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value || "NOT SET"; localStorage.setItem('chan_run_loc', runLocation); locDisplay.innerText = runLocation; document.getElementById('locModal').style.display = 'none'; };
+    document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('saveGoal').onclick = () => { targetGoal = parseFloat(document.getElementById('goalInput').value) || 0; targetDate = document.getElementById('dateInput').value; localStorage.setItem('chan_target_km', targetGoal); localStorage.setItem('chan_target_date', targetDate); updateProgress(); checkStatus(); document.getElementById('goalModal').style.display = 'none'; };
+    
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
-            const runs = req.result;
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
-            doc.setFontSize(10); doc.setTextColor(0); doc.text(`Total Lifetime Distance: ${totalDistance.toFixed(2)} KM`, 14, 35);
-            const tableData = [...runs].reverse().map(run => [run.date, run.distance + " KM", run.duration, run.pace, run.location]);
-            doc.autoTable({ startY: 45, head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']], body: tableData, headStyles: { fillColor: [50, 215, 75] } });
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("RUN REPORT", 14, 20);
+            doc.autoTable({ startY: 35, head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']], body: req.result.reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]), headStyles: { fillColor: [50, 215, 75] } });
             doc.save(`Chan_Runs.pdf`);
         };
     };
-
+    
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
