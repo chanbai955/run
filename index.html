@@ -203,36 +203,37 @@
     }
 
     function start() {
-        lastCoords = null; lastPointTime = Date.now(); speak("Running started");
+        // RESET SESSION LOGIC FOR NEW RUN
+        sessionDistance = 0; totalSeconds = 0; lastCoords = null; 
+        lastPointTime = Date.now(); lastSpokenDistance = 0;
+        timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
+        
+        speak("Running");
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.05) {
+            
+            // PACE CALCULATION: Active after 10 meters
+            if(sessionDistance > 0.01) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
-            } else {
-                paceEl.innerText = "0'00\"";
             }
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            
-            // 1. ACCURACY GATE: Ignore if accuracy is poor (over 30m error)
-            if (pos.coords.accuracy > 30) return; 
+            if (pos.coords.accuracy > 40) return; 
 
             if (lastCoords) {
                 const R = 6371;
-                const lat1 = lastCoords.lat * Math.PI/180;
-                const lat2 = pos.coords.latitude * Math.PI/180;
                 const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2)**2;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(pos.coords.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
 
-                // 2. IDLE LOCK: Ignore if distance moved is < 10 meters OR speed is < 3.0km/h
-                if (d > 0.01 && speed > 3.0) { 
+                // ADJUSTED IDLE BARRIER: 5m and 2.0km/h speed
+                if (d > 0.005 && speed > 2.0) { 
                     sessionDistance += d; updateProgress();
                     if (sessionDistance >= lastSpokenDistance + 0.5) {
                         lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
@@ -241,7 +242,7 @@
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now();
                 }
             } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
-        }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
+        }, null, {enableHighAccuracy: true});
         startBtn.classList.add('hidden'); stopBtn.classList.remove('hidden');
     }
 
@@ -250,7 +251,7 @@
         totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
-        speak("Run finished"); location.reload();
+        speak("Finished"); location.reload();
     };
 
     function deleteRun(id) { if (confirm("Delete?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id).onsuccess = renderHistory; } }
@@ -273,6 +274,7 @@
     document.getElementById('saveLoc').onclick = () => { runLocation = document.getElementById('locInput').value; localStorage.setItem('chan_run_loc', runLocation); location.reload(); };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
     document.getElementById('saveGoal').onclick = () => { localStorage.setItem('chan_target_km', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); };
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start NEW run session? Current display will reset.")) { sessionDistance = 0; timerEl.innerText = "00:00"; paceEl.innerText = "0'00\""; distEl.innerText = "0.00"; } };
     document.getElementById('startBtn').onclick = start;
     document.getElementById('resetBtn').onclick = () => location.reload();
 </script>
