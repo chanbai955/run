@@ -26,18 +26,14 @@
             overflow: hidden;
         }
 
-        /* Header Layout */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 1.1rem; font-weight: 900; }
         #liveClock { font-size: 1rem; margin-top: 5px; font-weight: 800; opacity: 0.8; }
-        .title-container { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding-left: 20px; }
+        .title-container { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding-left: 30px; }
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
-        
-        .header-controls { display: flex; gap: 10px; }
 
-        /* Main Display */
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
         .main-stat {
             font-size: clamp(6.5rem, 25vw, 8.5rem); 
@@ -60,7 +56,6 @@
         .stat-box h2 { margin: 0; font-size: 2rem; }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
-        /* Controls Section */
         .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; }
         
         .goal-container { width: 90%; margin-bottom: 5px; }
@@ -102,10 +97,6 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* Exit Button Red Style */
-        .exit-btn { background: #333; color: var(--danger-red) !important; width: 40px; height: 40px; }
-
-        /* Modals */
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; max-width: 360px; padding: 30px; border-radius: 25px; border: 1px solid #333; text-align: center; }
         .input-group-container-vertical { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; width: 100%; }
@@ -142,10 +133,7 @@
             <div class="app-title">Chanthiran</div>
             <div class="app-subtitle">RUN TRACKER</div>
         </div>
-        <div class="header-controls">
-            <button id="resetBtn" class="btn btn-side" style="width:40px; height:40px;"><span class="material-icons-round">refresh</span></button>
-            <button id="exitBtn" class="btn btn-side exit-btn"><span class="material-icons-round">power_settings_new</span></button>
-        </div>
+        <button id="resetBtn" class="btn btn-side" style="width:40px; height:40px;"><span class="material-icons-round">refresh</span></button>
     </div>
     
     <div class="main-display">
@@ -293,6 +281,8 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
+            
+            // 1. SIGNAL QUALITY FILTER (Only accept accurate points)
             if (pos.coords.accuracy > 30) return; 
 
             if (lastCoords) {
@@ -302,12 +292,16 @@
                 const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180;
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const d = R * c;
 
                 const timeNow = Date.now();
                 const timeDiffHours = (timeNow - lastPointTime) / 3600000;
                 const speed = d / timeDiffHours;
 
+                // 2. IDLE DRIFT FILTER (The Strava logic)
+                // - Ignore if distance moved is less than 5 meters
+                // - Ignore if speed is less than 2.5 km/h (sitting/standing jitter)
                 if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; 
                     updateProgress(); 
@@ -334,7 +328,17 @@
         }
     }
 
-    startBtn.onclick = () => { if (!watchID) start(); else { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); watchID = null; isPaused = true; setUI('paused'); speak("Paused"); } };
+    startBtn.onclick = () => { 
+        if (!watchID) start(); 
+        else { 
+            clearInterval(timerInterval); 
+            navigator.geolocation.clearWatch(watchID); 
+            watchID = null; 
+            isPaused = true;
+            setUI('paused'); 
+            speak("Paused");
+        } 
+    };
     
     stopBtn.onclick = () => { 
         clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID);
@@ -351,7 +355,8 @@
             sessionDistance = 0; totalDistance = 0; targetGoal = 0; targetDate = ""; 
             totalSeconds = 0; lastSpokenDistance = 0; isPaused = false;
             localStorage.setItem('chan_accumulated_km', 0);
-            localStorage.removeItem('chan_target_km'); localStorage.removeItem('chan_target_date'); 
+            localStorage.removeItem('chan_target_km');
+            localStorage.removeItem('chan_target_date'); 
             updateProgress(); checkStatus(); 
             timerEl.innerText = "00:00"; paceEl.innerText = "0'00\"";
             setUI('paused');
@@ -364,11 +369,20 @@
     document.getElementById('saveGoal').onclick = () => { 
         targetGoal = parseFloat(document.getElementById('goalInput').value) || 0; 
         targetDate = document.getElementById('dateInput').value;
-        localStorage.setItem('chan_target_km', targetGoal); localStorage.setItem('chan_target_date', targetDate);
-        updateProgress(); checkStatus(); document.getElementById('goalModal').style.display = 'none'; 
+        localStorage.setItem('chan_target_km', targetGoal); 
+        localStorage.setItem('chan_target_date', targetDate);
+        updateProgress(); checkStatus();
+        document.getElementById('goalModal').style.display = 'none'; 
     };
 
-    function deleteRun(id) { if (confirm("Delete this run entry?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id); tx.oncomplete = () => renderHistory(); } }
+    function deleteRun(id) {
+        if (confirm("Delete this run entry?")) {
+            const tx = db.transaction("runs", "readwrite");
+            tx.objectStore("runs").delete(id);
+            tx.oncomplete = () => renderHistory();
+        }
+    }
+
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
@@ -377,7 +391,14 @@
             req.result.reverse().forEach(run => {
                 const row = document.createElement('div');
                 row.className = "history-item";
-                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div><div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>`;
+                row.innerHTML = `
+                    <div class="history-content">
+                        <strong>${run.date}</strong><br>
+                        ${run.distance} KM | ${run.duration} | ${run.pace}<br>
+                        <small>${run.location}</small>
+                    </div>
+                    <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>
+                `;
                 list.appendChild(row);
             });
         };
@@ -387,17 +408,7 @@
     const closeHistoryFn = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('closeHistory').onclick = closeHistoryFn;
     document.getElementById('bottomCloseHistory').onclick = closeHistoryFn;
-    
-    // Reset Button Logic
     document.getElementById('resetBtn').onclick = () => location.reload();
-
-    // EXIT Button Logic
-    document.getElementById('exitBtn').onclick = () => {
-        if (confirm("Exit the application?")) {
-            window.close(); // Try to close tab
-            setTimeout(() => { window.location.href = "about:blank"; }, 100); // Redirect if close is blocked
-        }
-    };
 </script>
 </body>
 </html>
