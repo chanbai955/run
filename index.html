@@ -253,13 +253,11 @@
     function checkVoiceMilestones() {
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            let currentPace = paceEl.innerText; // Format: 5'30"
+            let currentPace = paceEl.innerText; 
             let pParts = currentPace.split("'");
             let pMin = pParts[0];
             let pSec = pParts[1] ? pParts[1].replace('"', '') : "0";
-            
-            let msg = `${lastSpokenDistance} kilometers. Pace ${pMin} minutes ${pSec} seconds.`;
-            speak(msg);
+            speak(`${lastSpokenDistance} kilometers. Pace ${pMin} minutes ${pSec} seconds.`);
         }
     }
 
@@ -268,7 +266,7 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.02) {
+            if(sessionDistance > 0.03) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = totalMin < 40 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "40'00\"+";
             }
@@ -276,21 +274,29 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             updateGpsIcon(pos.coords.accuracy);
-            if (pos.coords.accuracy > 75) return; 
+            
+            // 1. SIGNAL QUALITY FILTER (Discard inaccurate points)
+            if (pos.coords.accuracy > 40) return; 
+
             if (lastCoords) {
                 const R = 6371; const lat1 = lastCoords.lat * Math.PI/180; const lat2 = pos.coords.latitude * Math.PI/180;
                 const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180; const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
                 const d = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-                const speed = d / ((Date.now() - lastPointTime) / 3600000);
-                
-                // RESTORED STABLE LOGIC: 5m and >1.5km/h
-                if (d > 0.005 && speed > 1.5) { 
+
+                const timeNow = Date.now();
+                const timeDiffHours = (timeNow - lastPointTime) / 3600000;
+                const speed = d / timeDiffHours;
+
+                // 2. IDLE DRIFT FILTER (The Strava logic)
+                // - Only record if distance moved is > 5 meters
+                // - AND speed is > 2.5 km/h (this specifically stops the "wobble" while standing)
+                if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; 
                     updateProgress(); 
                     checkVoiceMilestones();
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; 
-                    lastPointTime = Date.now(); 
+                    lastPointTime = timeNow; 
                 }
             } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
         }, null, {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
