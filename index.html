@@ -72,14 +72,13 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS & CHART */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
         
         .sticky-history-header { 
             position: sticky; 
             top: 0; 
-            margin-top: 15px; /* Bring down to avoid browser overlay */
+            margin-top: 15px; 
             background: rgba(28, 28, 30, 0.95); 
             backdrop-filter: blur(10px); 
             z-index: 10; 
@@ -90,9 +89,20 @@
             border-bottom: 1px solid #333; 
         }
         
+        .chart-wrapper {
+            margin: 15px 25px;
+            padding: 20px 10px;
+            background: #121212;
+            border-radius: 15px;
+            border: 1px solid #333;
+        }
+
         .chart-container { 
-            padding: 20px; background: #121212; margin: 15px 25px; border-radius: 15px; 
-            display: flex; align-items: flex-end; justify-content: space-between; height: 120px; border: 1px solid #333;
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: space-around; 
+            height: 120px;
+            margin-bottom: 5px;
         }
         
         .chart-bar { 
@@ -100,23 +110,27 @@
             min-height: 5px; position: relative; display: flex; align-items: flex-end; justify-content: center;
         }
         
-        /* VERTICAL DISTANCE INSIDE BAR */
-        .chart-bar span {
+        .chart-bar span.bar-val {
             writing-mode: vertical-rl;
             transform: rotate(180deg);
             color: #000;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: 900;
             margin-bottom: 5px;
             pointer-events: none;
         }
 
-        .history-list-container { padding: 0 25px 120px 25px; }
-        .history-item { 
-            background: #2c2c2e; margin-bottom: 12px; padding: 15px; 
-            border-radius: 15px; border-left: 4px solid var(--accent-blue);
-            display: flex; justify-content: space-between; align-items: center;
+        .chart-bar span.bar-date {
+            position: absolute;
+            bottom: -22px;
+            color: #888;
+            font-size: 0.55rem;
+            font-weight: 800;
+            white-space: nowrap;
         }
+
+        .history-list-container { padding: 10px 25px 120px 25px; }
+        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
         .history-content { flex: 1; }
         .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 15px; }
         
@@ -193,7 +207,9 @@
                 </div>
             </div>
             
-            <div class="chart-container" id="runChart"></div>
+            <div class="chart-wrapper">
+                <div class="chart-container" id="runChart"></div>
+            </div>
             
             <div class="history-list-container">
                 <div id="lapList"></div>
@@ -252,7 +268,8 @@
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
-        const diffDays = Math.ceil((new Date(targetDate) - new Date()) / 86400000);
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
         document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
         document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
     }
@@ -321,15 +338,22 @@
             const chart = document.getElementById('runChart'); chart.innerHTML = "";
             const runs = req.result;
             
-            // Build Notes Chart (Last 10 runs)
-            const recentRuns = runs.slice(-8); // 8 bars fit better on mobile
+            // Build Chart (Last 7 runs to avoid crowding dates)
+            const recentRuns = runs.slice(-7);
             const maxDist = Math.max(...recentRuns.map(r => parseFloat(r.distance))) || 1;
             
             recentRuns.forEach(run => {
                 const bar = document.createElement('div'); bar.className = 'chart-bar';
                 bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
-                // Add vertical distance label inside the bar
-                bar.innerHTML = `<span>${run.distance}</span>`;
+                
+                // Shorten date for chart (e.g., 28/01/2026 -> 28/1)
+                const dateParts = run.date.split('/');
+                const shortDate = `${dateParts[0]}/${parseInt(dateParts[1])}`;
+                
+                bar.innerHTML = `
+                    <span class="bar-val">${run.distance}</span>
+                    <span class="bar-date">${shortDate}</span>
+                `;
                 chart.appendChild(bar);
             });
 
@@ -342,7 +366,6 @@
         };
     }
 
-    // PDF EXPORT WITHOUT CHART
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
