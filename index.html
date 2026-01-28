@@ -72,7 +72,6 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
@@ -217,7 +216,8 @@
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
-        const diffDays = Math.ceil((new Date(targetDate) - new Date()) / 86400000);
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
         document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
         document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
     }
@@ -255,7 +255,7 @@
                 const a = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
-                if (d > 0.01 && speed > 3.0) { 
+                if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; updateProgress(); checkVoiceMilestones();
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now();
                 }
@@ -301,7 +301,7 @@
         };
     }
 
-    // FIXED PDF EXPORT FUNCTION
+    // FIXED PDF EXPORT WITH VERTICAL BAR VALUES
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
@@ -310,15 +310,45 @@
             if(runs.length === 0) { alert("No runs found."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const accent = [50, 215, 75]; // Neon Green
+            const accent = [50, 215, 75]; 
             
             doc.setFontSize(22); doc.setTextColor(...accent); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
             doc.setFontSize(10); doc.setTextColor(100); doc.text(`LIFETIME DISTANCE: ${totalDistance.toFixed(2)} KM`, 14, 28);
 
+            // Chart Drawing Logic
+            const maxDist = Math.max(...runs.map(r => parseFloat(r.distance)));
+            const chartRuns = runs.slice(-10);
+            const chartX = 25;
+            const chartY = 85;
+            const barWidth = 12;
+            const chartHeight = 40;
+
+            doc.setFontSize(12); doc.setTextColor(0); doc.text("RECENT PROGRESS (KM)", 14, 40);
+
+            chartRuns.forEach((run, i) => {
+                const val = parseFloat(run.distance);
+                const h = (val / (maxDist || 1)) * chartHeight;
+                const xPos = chartX + (i * 16);
+                
+                // Draw Bar
+                doc.setFillColor(...accent);
+                doc.rect(xPos, chartY - h, barWidth, h, 'F');
+                
+                // Add Vertical KM Value
+                doc.setFontSize(7);
+                doc.setTextColor(0);
+                doc.text(`${val} km`, xPos + 7, chartY - h - 5, { angle: 90 });
+                
+                // Add Date underneath
+                doc.setFontSize(6);
+                doc.setTextColor(100);
+                doc.text(run.date.split('/')[0], xPos + 3, chartY + 5);
+            });
+
             const tableData = [...runs].reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
 
             doc.autoTable({
-                startY: 35,
+                startY: 95,
                 head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
                 body: tableData,
                 headStyles: { fillColor: accent, textColor: [0, 0, 0] },
