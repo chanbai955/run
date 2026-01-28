@@ -84,17 +84,6 @@
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
         .input-box { background: #fff; border-radius: 15px; margin-bottom: 15px; }
         .modal-card input { width: 90%; padding: 15px; border: none; font-size: 1.2rem; font-weight: 700; outline: none; color: #000; }
-        /* Style for date input specifically to show placeholder when empty */
-        .modal-card input[type="date"]::before {
-            content: attr(placeholder);
-            width: 100%;
-            color: #666;
-        }
-        .modal-card input[type="date"]:focus::before,
-        .modal-card input[type="date"]:valid::before {
-            content: "";
-            display: none;
-        }
         .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; border: none; }
     </style>
 </head>
@@ -176,6 +165,7 @@
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null, lastPointTime = 0, lastSpokenDistance = 0, db;
     let isPaused = false;
+    let wakeLock = null;
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
@@ -191,6 +181,12 @@
     window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; };
 
     function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
+
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
+        } catch (err) { console.error(`${err.name}, ${err.message}`); }
+    }
 
     function updateProgress() {
         distEl.innerText = sessionDistance.toFixed(2);
@@ -211,18 +207,35 @@
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
-        const diffDays = Math.ceil((new Date(targetDate) - new Date()) / 86400000);
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
         document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
         document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
     }
 
-    function start() {
-        if (!isPaused) {
-            speak("Running started");
-            lastPointTime = Date.now();
-        } else {
-            speak("Running resumed");
+    function checkVoiceMilestones() {
+        // Logic for notifications every 0.5km
+        if (sessionDistance >= lastSpokenDistance + 0.5) {
+            lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
+            
+            // Every 1.0 km (Full kilometer)
+            if (lastSpokenDistance % 1 === 0) {
+                let currentPace = paceEl.innerText; // Format: 5'30"
+                let pParts = currentPace.split("'");
+                let pMin = pParts[0];
+                let pSec = pParts[1] ? pParts[1].replace('"', '') : "0";
+                speak(`${lastSpokenDistance} kilometers completed. Pace is ${pMin} minutes and ${pSec} seconds.`);
+            } 
+            // Every 0.5 km (Half kilometer)
+            else {
+                speak(`${lastSpokenDistance} kilometers.`);
+            }
         }
+    }
+
+    function start() {
+        if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); requestWakeLock(); }
+        else { speak("Running resumed"); }
         
         isPaused = false;
         startIcon.innerText = "pause";
@@ -233,13 +246,8 @@
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                if (totalMin < 30) {
-                   paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`;
-                } else {
-                   paceEl.innerText = "0'00\"";
-                }
-            } else {
-               paceEl.innerText = "0'00\"";
+                if (totalMin < 30) { paceEl.innerText = `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"`; }
+                else { paceEl.innerText = "0'00\""; }
             }
         }, 1000);
 
@@ -253,27 +261,16 @@
                 const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(pos.coords.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                
-                const timeDiff = (Date.now() - lastPointTime) / 3600000;
-                const speed = d / timeDiff;
+                const speed = d / ((Date.now() - lastPointTime) / 3600000);
 
                 if (d > 0.01 && speed > 3.0) { 
                     sessionDistance += d; 
                     updateProgress();
-                    
-                    if (sessionDistance >= lastSpokenDistance + 0.5) {
-                        lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-                        const paceMins = Math.floor((totalSeconds/60)/sessionDistance);
-                        speak(`${lastSpokenDistance} kilometers. Pace ${paceMins} minutes.`);
-                    }
-                    
+                    checkVoiceMilestones();
                     lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; 
                     lastPointTime = Date.now();
                 }
-            } else { 
-                lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; 
-                lastPointTime = Date.now(); 
-            }
+            } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
         }, null, {enableHighAccuracy: true, maximumAge: 0, timeout: 5000});
     }
 
@@ -283,12 +280,10 @@
         isPaused = true;
         startIcon.innerText = "play_arrow";
         speak("Paused");
+        if (wakeLock !== null) { wakeLock.release().then(() => wakeLock = null); }
     }
 
-    startBtn.onclick = () => {
-        if (startIcon.innerText === "pause") pause();
-        else start();
-    };
+    startBtn.onclick = () => { if (startIcon.innerText === "pause") pause(); else start(); };
 
     stopBtn.onclick = () => {
         clearInterval(timerInterval);
@@ -298,18 +293,12 @@
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation });
         speak("Finished and Saved");
+        if (wakeLock !== null) { wakeLock.release().then(() => wakeLock = null); }
         location.reload();
     };
 
-    document.getElementById('newRunBtn').onclick = () => { 
-        if(confirm("Start NEW run session? History and Progress will reset.")) { 
-            localStorage.clear(); 
-            location.reload(); 
-        } 
-    };
-
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start NEW session? All progress will reset.")) { localStorage.clear(); location.reload(); } };
     function deleteRun(id) { if (confirm("Delete?")) { const tx = db.transaction("runs", "readwrite"); tx.objectStore("runs").delete(id).onsuccess = renderHistory; } }
-
     function renderHistory() {
         db.transaction("runs").objectStore("runs").getAll().onsuccess = (e) => {
             const list = document.getElementById('lapList'); list.innerHTML = "";
