@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Chan's Run Pro</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
@@ -30,25 +32,32 @@
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
 
-        .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; }
+        .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
+        
+        /* MAP STYLING */
+        #map { 
+            position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; 
+            border-radius: 20px; border: 1px solid #333; z-index: 5;
+            display: none; /* Only show when running */
+        }
+
         .main-stat {
             font-size: clamp(6.5rem, 25vw, 8.5rem); font-weight: 900; margin: 0;
             background: linear-gradient(180deg, #fff 40%, var(--neon-green));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 0.8;
+            z-index: 10; pointer-events: none;
         }
         
-        .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; }
+        .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; z-index: 10; }
         .label { font-size: 1rem; color: #666; letter-spacing: 4px; font-weight: 800; margin: 0; }
         #gpsIcon { font-size: 24px; transition: all 0.3s ease; color: #333; }
         .sig-good { color: var(--accent-blue) !important; filter: drop-shadow(0 0 10px var(--accent-blue)); }
-        .sig-poor { color: var(--warning-yellow) !important; }
-        .sig-none { color: var(--danger-red) !important; }
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 30px; text-align: center; }
-        .stat-box h2 { margin: 0; font-size: 2rem; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 30px; text-align: center; z-index: 10; }
+        .stat-box h2 { margin: 0; font-size: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
-        .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; }
+        .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; z-index: 100; }
         .goal-container { width: 90%; margin-bottom: 5px; }
         .goal-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 8px; font-weight: 800; }
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; }
@@ -72,83 +81,30 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
+        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; position: relative; }
+        .sticky-history-header { position: sticky; top: 0; margin-top: 15px; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         
-        .sticky-history-header { 
-            position: sticky; 
-            top: 0; 
-            margin-top: 15px; 
-            background: rgba(28, 28, 30, 0.95); 
-            backdrop-filter: blur(10px); 
-            z-index: 10; 
-            padding: 25px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #333; 
-        }
-        
-        /* SCROLLABLE CHART WRAPPER */
-        .chart-wrapper {
-            margin: 15px 25px;
-            padding: 20px 10px 35px 10px; /* Extra bottom padding for dates */
-            background: #121212;
-            border-radius: 15px;
-            border: 1px solid #333;
-            overflow-x: auto; /* Enable horizontal scroll */
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .chart-container { 
-            display: inline-flex; 
-            align-items: flex-end; 
-            gap: 15px;
-            min-width: 100%;
-            height: 120px;
-        }
-        
-        .chart-bar { 
-            flex: 0 0 45px; /* Fixed width for bars to ensure scrolling */
-            background: var(--neon-green); 
-            border-radius: 6px 6px 0 0; 
-            min-height: 5px; 
-            position: relative; 
-            display: flex; 
-            align-items: flex-end; 
-            justify-content: center;
-        }
-        
-        .chart-bar span.bar-val {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            color: #000;
-            font-size: 0.6rem;
-            font-weight: 900;
-            margin-bottom: 8px;
-            pointer-events: none;
-        }
-
-        .chart-bar span.bar-date {
-            position: absolute;
-            bottom: -25px;
-            color: #888;
-            font-size: 0.6rem;
-            font-weight: 800;
-        }
+        .chart-wrapper { margin: 15px 25px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
+        .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; min-height: 5px; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+        .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: #000; font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; pointer-events: none; }
+        .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
 
         .history-list-container { padding: 10px 25px 120px 25px; }
         .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
-        .history-content { flex: 1; }
         .history-del-btn { color: var(--danger-red); cursor: pointer; padding-left: 15px; }
         
-        .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
         .input-box { background: #fff; border-radius: 15px; margin-bottom: 15px; }
         .modal-card input { width: 90%; padding: 15px; border: none; font-size: 1.2rem; font-weight: 700; outline: none; color: #000; }
         .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; border: none; }
+        
+        /* Map Tile Filter to match dark theme */
+        .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .leaflet-control-attribution { display: none; }
     </style>
 </head>
 <body>
@@ -166,6 +122,7 @@
     </div>
     
     <div class="main-display">
+        <div id="map"></div>
         <p class="main-stat" id="distance">0.00</p>
         <div class="label-row">
             <p class="label">KILOMETERS</p>
@@ -215,20 +172,13 @@
                     <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
                 </div>
             </div>
-            
-            <div class="chart-wrapper">
-                <div class="chart-container" id="runChart"></div>
-            </div>
-            
-            <div class="history-list-container">
-                <div id="lapList"></div>
-                <button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button>
-            </div>
+            <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
+            <div class="history-list-container"><div id="lapList"></div><button class="bottom-close-btn" id="bottomCloseHistory">Close Notes</button></div>
         </div>
     </div>
 
     <div id="locModal" class="standard-modal"><div class="modal-card"><h2>LOCATION</h2><div class="input-box"><input type="text" id="locInput" placeholder="Enter Location"></div><button id="saveLoc" class="btn-compact">SAVE</button></div></div>
-    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="Enter KM"></div><div class="input-box"><input type="date" id="dateInput" placeholder="Select Date" required></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
+    <div id="goalModal" class="standard-modal"><div class="modal-card"><h2>SET TARGET</h2><div class="input-box"><input type="number" id="goalInput" placeholder="Enter KM"></div><div class="input-box"><input type="date" id="dateInput" required></div><button id="saveGoal" class="btn-compact">SET</button></div></div>
 
 <script>
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
@@ -237,6 +187,10 @@
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null, lastPointTime = 0, lastSpokenDistance = 0, db;
     let isPaused = false, wakeLock = null;
+    
+    // MAP VARIABLES
+    let map, routeLine, currentMarker;
+    let runPath = [];
 
     const dbReq = indexedDB.open("RunProEliteDB", 1);
     dbReq.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
@@ -249,13 +203,20 @@
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
 
-    window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; };
+    window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; initMap(); };
 
     function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
 
     async function requestWakeLock() {
         try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } 
-        catch (err) { console.error(`${err.name}, ${err.message}`); }
+        catch (err) { console.error(err); }
+    }
+
+    function initMap() {
+        map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        routeLine = L.polyline([], {color: '#32D74B', weight: 6, opacity: 0.8}).addTo(map);
+        currentMarker = L.circleMarker([0, 0], {radius: 8, color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 1}).addTo(map);
     }
 
     function updateProgress() {
@@ -272,12 +233,13 @@
         const icon = document.getElementById('gpsIcon');
         icon.classList.remove('sig-good', 'sig-poor', 'sig-none');
         if (accuracy < 25) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
-        else { icon.classList.add('sig-poor'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (FILTERING)`; accDisplay.style.color = "var(--warning-yellow)"; }
+        else { icon.classList.add('sig-poor'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (DRIFT RISK)`; accDisplay.style.color = "var(--warning-yellow)"; }
     }
 
     function checkStatus() {
         if (!targetDate || targetGoal <= 0) return;
-        const diffDays = Math.ceil((new Date(targetDate) - new Date()) / 86400000);
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
         document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
         document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
     }
@@ -294,6 +256,7 @@
     }
 
     function start() {
+        document.getElementById('map').style.display = 'block';
         if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); requestWakeLock(); }
         else { speak("Resumed"); }
         isPaused = false; startIcon.innerText = "pause"; stopBtn.classList.remove('hidden');
@@ -307,19 +270,29 @@
         }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
             updateGpsIcon(pos.coords.accuracy);
+            
+            // Map follow logic
+            currentMarker.setLatLng([lat, lng]);
+            map.panTo([lat, lng]);
+
             if (pos.coords.accuracy > 30) return; 
+            
             if (lastCoords) {
-                const R = 6371; const lat1 = lastCoords.lat * Math.PI/180; const lat2 = pos.coords.latitude * Math.PI/180;
-                const dLat = (pos.coords.latitude - lastCoords.lat) * Math.PI/180; const dLon = (pos.coords.longitude - lastCoords.lon) * Math.PI/180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(pos.coords.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
+                const R = 6371; const lat1 = lastCoords.lat * Math.PI/180; const lat2 = lat * Math.PI/180;
+                const dLat = (lat - lastCoords.lat) * Math.PI/180; const dLon = (lng - lastCoords.lon) * Math.PI/180;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
+                
                 if (d > 0.005 && speed > 2.5) { 
                     sessionDistance += d; updateProgress(); checkVoiceMilestones();
-                    lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now();
+                    lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now();
+                    routeLine.addLatLng([lat, lng]); // LIVE ROUTE DRAWING
                 }
-            } else { lastCoords = {lat: pos.coords.latitude, lon: pos.coords.longitude}; lastPointTime = Date.now(); }
+            } else { lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now(); map.setView([lat, lng], 17); }
         }, null, {enableHighAccuracy: true, timeout: 5000});
     }
 
@@ -345,34 +318,21 @@
             const list = document.getElementById('lapList'); list.innerHTML = "";
             const chart = document.getElementById('runChart'); chart.innerHTML = "";
             const runs = req.result;
-            
-            // SHOW ALL RUNS IN SCROLLABLE CHART
             const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
-            
             runs.forEach(run => {
                 const bar = document.createElement('div'); bar.className = 'chart-bar';
                 bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
-                
                 const dateParts = run.date.split('/');
-                const shortDate = `${dateParts[0]}/${parseInt(dateParts[1])}`;
-                
-                bar.innerHTML = `
-                    <span class="bar-val">${run.distance} KM</span>
-                    <span class="bar-date">${shortDate}</span>
-                `;
+                bar.innerHTML = `<span class="bar-val">${run.distance} KM</span><span class="bar-date">${dateParts[0]}/${parseInt(dateParts[1])}</span>`;
                 chart.appendChild(bar);
             });
-
             runs.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
                 row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration} | ${run.pace}<br><small>${run.location}</small></div>
                                  <div class="history-del-btn" onclick="deleteRun(${run.id})"><span class="material-icons-round">delete</span></div>`;
                 list.appendChild(row);
             });
-            
-            // Scroll to the end of chart automatically
-            const wrapper = document.querySelector('.chart-wrapper');
-            wrapper.scrollLeft = wrapper.scrollWidth;
+            document.querySelector('.chart-wrapper').scrollLeft = 9999;
         };
     }
 
@@ -381,34 +341,18 @@
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
             const runs = req.result;
-            if(runs.length === 0) { alert("No runs found."); return; }
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const accent = [50, 215, 75]; 
-            
-            doc.setFontSize(22); doc.setTextColor(...accent); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
-            doc.setFontSize(10); doc.setTextColor(100); doc.text(`LIFETIME DISTANCE: ${totalDistance.toFixed(2)} KM`, 14, 28);
-            doc.text(`REPORT GENERATED: ${new Date().toLocaleDateString()}`, 14, 33);
-
-            const tableData = [...runs].reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
-
-            doc.autoTable({
-                startY: 40,
-                head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
-                body: tableData,
-                headStyles: { fillColor: accent, textColor: [0, 0, 0] },
-                alternateRowStyles: { fillColor: [240, 240, 240] }
-            });
-
-            doc.save(`Chan_Run_Report_${new Date().getTime()}.pdf`);
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
+            doc.autoTable({ startY: 35, head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']], body: req.result.reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]), headStyles: { fillColor: [50, 215, 75], textColor: [0,0,0] } });
+            doc.save(`Chan_Runs.pdf`);
         };
     };
 
-    function deleteRun(id) { if (confirm("Delete run?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
+    function deleteRun(id) { if (confirm("Delete?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('bottomCloseHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Reset all progress?")) { localStorage.clear(); location.reload(); } };
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Reset all?")) { localStorage.clear(); location.reload(); } };
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
     document.getElementById('saveLoc').onclick = () => { localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); location.reload(); };
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
