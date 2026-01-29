@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Chan's Run Pro</title>
+    <title>Run Tracker</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -133,12 +133,10 @@
             </div>
             <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
         </div>
-        
         <div class="target-info-row">
             <span id="balDateDisplay">DUE: NOT SET</span>
             <span id="daysLeftDisplay"></span>
         </div>
-
         <div class="location-section">
             <span class="material-icons-round" id="editLoc" style="color: var(--accent-blue); cursor:pointer;">place</span>
             <span id="locDisplay">NOT SET</span>
@@ -180,7 +178,6 @@
             <h2>LOCATION</h2>
             <div class="input-box"><input type="text" id="locInput" placeholder="Enter Route"></div>
             <button id="saveLoc" class="btn-compact">SAVE</button>
-            <button onclick="document.getElementById('locModal').style.display='none'" style="background:none; border:none; color:#888; margin-top:15px; font-weight:800;">CANCEL</button>
         </div>
     </div>
 
@@ -190,7 +187,6 @@
             <div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div>
             <div class="input-box"><input type="date" id="dateInput"></div>
             <button id="saveGoal" class="btn-compact">SET GOAL</button>
-            <button onclick="document.getElementById('goalModal').style.display='none'" style="background:none; border:none; color:#888; margin-top:15px; font-weight:800;">CANCEL</button>
         </div>
     </div>
 
@@ -220,11 +216,7 @@
 
     window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; initMap(); };
 
-    // VOICE FUNCTION
-    function speak(text) { 
-        window.speechSynthesis.cancel(); 
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); 
-    }
+    function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
 
     function initMap() {
         map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
@@ -257,32 +249,21 @@
         document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
     }
 
-    // MILESTONE VOICE LOGIC
     function checkVoiceMilestones() {
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
             if (lastSpokenDistance % 1 === 0) {
                 let pParts = paceEl.innerText.split("'");
-                let pMin = pParts[0];
-                let pSec = pParts[1] ? pParts[1].replace('"', '') : "0";
-                speak(`${lastSpokenDistance} kilometers. Pace ${pMin} minutes ${pSec} seconds.`);
+                speak(`${lastSpokenDistance} kilometers. Pace ${pParts[0]} minutes.`);
             } else { speak(`${lastSpokenDistance} kilometers.`); }
         }
     }
 
     function start() {
         document.getElementById('map').style.display = 'block';
-        if (!isPaused) { 
-            speak("Running started"); // Voice on Start
-            lastPointTime = Date.now(); 
-            runPath = []; 
-        } else {
-            speak("Running resumed"); // Voice on Resume
-        }
-        
-        isPaused = false; 
-        startIcon.innerText = "pause"; 
-        stopBtn.classList.remove('hidden');
+        if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); runPath = []; }
+        else { speak("Resumed"); }
+        isPaused = false; startIcon.innerText = "pause"; stopBtn.classList.remove('hidden');
         
         timerInterval = setInterval(() => {
             totalSeconds++;
@@ -319,13 +300,7 @@
     }
 
     startBtn.onclick = () => {
-        if (startIcon.innerText === "pause") { 
-            clearInterval(timerInterval); 
-            navigator.geolocation.clearWatch(watchID); 
-            isPaused = true; 
-            startIcon.innerText = "play_arrow"; 
-            speak("Running paused"); // Voice on Pause
-        }
+        if (startIcon.innerText === "pause") { clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID); isPaused = true; startIcon.innerText = "play_arrow"; speak("Paused"); }
         else start();
     };
 
@@ -337,8 +312,7 @@
             date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), 
             pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation, route: runPath 
         });
-        speak("Running finished"); // Voice on Stop
-        location.reload();
+        speak("Finished"); location.reload();
     };
 
     function showSavedRoute(runId) {
@@ -387,6 +361,35 @@
             document.querySelector('.chart-wrapper').scrollLeft = 9999;
         };
     }
+
+    // PDF RESTORED FUNCTION
+    document.getElementById('exportPdf').onclick = () => {
+        const tx = db.transaction("runs", "readonly");
+        const req = tx.objectStore("runs").getAll();
+        req.onsuccess = () => {
+            const runs = req.result;
+            if(runs.length === 0) { alert("No runs found."); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const accent = [50, 215, 75]; // Neon Green
+            
+            doc.setFontSize(22); doc.setTextColor(...accent); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
+            doc.setFontSize(10); doc.setTextColor(100); doc.text(`LIFETIME DISTANCE: ${totalDistance.toFixed(2)} KM`, 14, 28);
+            doc.text(`DATE GENERATED: ${new Date().toLocaleDateString()}`, 14, 33);
+
+            const tableData = [...runs].reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
+
+            doc.autoTable({
+                startY: 40,
+                head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
+                body: tableData,
+                headStyles: { fillColor: accent, textColor: [0, 0, 0] },
+                alternateRowStyles: { fillColor: [240, 240, 240] }
+            });
+
+            doc.save(`Chan_Run_Report_${new Date().getTime()}.pdf`);
+        };
+    };
 
     function deleteRun(id) { if (confirm("Delete run?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
