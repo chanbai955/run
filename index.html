@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Run Tracker</title>
+    <title>Run Tracker Pro</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -59,7 +59,6 @@
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         
-        /* UPDATED: DARK GLOWING MAIN STAT */
         .main-stat { 
             font-size: clamp(6.5rem, 25vw, 8.5rem); 
             font-weight: 900; 
@@ -125,9 +124,16 @@
         .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; border: none; margin-top: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; cursor: pointer; }
+        
+        /* HIDDEN VIDEO FOR WAKE LOCK FALLBACK */
+        #wakeVideo { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
     </style>
 </head>
 <body>
+
+    <video id="wakeVideo" loop muted playsinline>
+        <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-1080p-60fps-30s/master/video.mp4" type="video/mp4">
+    </video>
 
     <div class="header">
         <div class="header-info">
@@ -234,6 +240,7 @@
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null, lastPointTime = 0, lastSpokenDistance = 0, db;
     let isPaused = false;
+    let wakeLock = null; // New WakeLock variable
     
     let map, routeLine, currentMarker, hMap, hRouteLine, runPath = [];
 
@@ -247,7 +254,7 @@
     const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'), paceEl = document.getElementById('pace'), 
           startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn'), 
           startIcon = document.getElementById('startIcon'), accDisplay = document.getElementById('accDisplay'),
-          headerIcon = document.getElementById('headerRunIcon');
+          headerIcon = document.getElementById('headerRunIcon'), wakeVideo = document.getElementById('wakeVideo');
 
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
@@ -255,6 +262,28 @@
     window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; initMap(); };
 
     function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
+
+    /* WAKE LOCK LOGIC */
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+            }
+            // Fallback: Play tiny video for Safari/iOS
+            wakeVideo.play();
+        } catch (err) { console.log("WakeLock failed: ", err); }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
+        wakeVideo.pause();
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            wakeLock = await navigator.wakeLock.request('screen');
+        }
+    });
 
     function initMap() {
         map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
@@ -272,7 +301,6 @@
             let percent = (cur / targetGoal) * 100;
             document.getElementById('balKm').innerText = Math.max(targetGoal - cur, 0).toFixed(2);
             document.getElementById('progressBar').style.width = Math.min(percent, 100) + "%";
-
             if (percent >= 100) {
                 headerIcon.classList.add('goal-reached');
                 if (!headerIcon.dataset.celebrated) {
@@ -313,6 +341,7 @@
     }
 
     function start() {
+        requestWakeLock(); // Request WakeLock when starting
         document.getElementById('map').style.display = 'block';
         if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); runPath = []; }
         else { speak("Resumed"); }
@@ -325,15 +354,12 @@
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            
             if(sessionDistance > 0.05) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
                 paceEl.innerText = totalMin < 35 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "0'00\"";
-
                 if (!headerIcon.classList.contains('goal-reached')) {
                     let pulseDuration = Math.max(0.4, Math.min(2.0, totalMin / 6)); 
                     headerIcon.style.setProperty('--pulse-speed', pulseDuration + 's');
-
                     if (totalMin <= 6.5) headerIcon.style.color = "var(--neon-green)";
                     else if (totalMin <= 9) headerIcon.style.color = "var(--accent-blue)";
                     else if (totalMin <= 12) headerIcon.style.color = "var(--warning-yellow)";
@@ -348,8 +374,6 @@
             currentMarker.setLatLng([lat, lng]);
             map.panTo([lat, lng]);
 
-            // Filter for indoor testing: Allow accuracy up to 50M if needed, 
-            // but 30M is best for actual runs.
             if (pos.coords.accuracy > 40) return; 
             
             if (lastCoords) {
@@ -359,8 +383,6 @@
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
                 
-                // UPDATED SENSITIVITY: 
-                // Checks for movement > 2 meters and speed > 0.5 km/h
                 if (d > 0.002 && speed > 0.5) { 
                     sessionDistance += d; updateProgress(); checkVoiceMilestones();
                     lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now();
@@ -368,7 +390,11 @@
                     routeLine.addLatLng([lat, lng]); 
                 }
             } else { lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now(); map.setView([lat, lng], 17); runPath.push([lat, lng]); }
-        }, null, {enableHighAccuracy: true});
+        }, (err) => { console.error(err); }, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000 // Persistent search every 10s
+        });
     }
 
     startBtn.onclick = () => {
@@ -378,13 +404,16 @@
             isPaused = true; 
             startIcon.innerText = "play_arrow"; 
             headerIcon.classList.remove('running-pulse');
+            releaseWakeLock(); // Release lock when paused
             speak("Paused"); 
         }
         else start();
     };
 
     stopBtn.onclick = () => {
-        clearInterval(timerInterval); navigator.geolocation.clearWatch(watchID);
+        clearInterval(timerInterval); 
+        navigator.geolocation.clearWatch(watchID);
+        releaseWakeLock(); // Fully release lock when finished
         totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
         headerIcon.classList.remove('running-pulse');
         headerIcon.style.color = "var(--neon-green)";
@@ -396,6 +425,7 @@
         speak("Finished"); location.reload();
     };
 
+    /* RENDERING & UTILITY FUNCTIONS */
     function showSavedRoute(runId) {
         db.transaction("runs").objectStore("runs").get(runId).onsuccess = (e) => {
             const run = e.target.result;
@@ -421,14 +451,12 @@
             list.innerHTML = ""; chart.innerHTML = "";
             const runs = req.result;
             const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
-            
             runs.forEach(run => {
                 const bar = document.createElement('div'); bar.className = 'chart-bar';
                 bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
                 bar.innerHTML = `<span class="bar-val">${run.distance} KM</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
                 chart.appendChild(bar);
             });
-
             runs.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
                 row.innerHTML = `
@@ -439,7 +467,6 @@
                     </div>`;
                 list.appendChild(row);
             });
-            document.querySelector('.chart-wrapper').scrollLeft = 9999;
         };
     }
 
