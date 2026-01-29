@@ -63,9 +63,22 @@
         #locDisplay { font-size: 0.8rem; color: var(--accent-blue); font-weight: 800; text-transform: uppercase; }
         .accuracy-box { font-size: 0.6rem; font-weight: 900; margin-bottom: 15px; opacity: 0.8; }
 
+        /* BUTTONS */
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; }
-        .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border: 2px solid #555; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; }
-        .new-run-circle span { color: white; font-weight: 900; line-height: 1; pointer-events: none; }
+        
+        /* FIXED NEW RUN BUTTON ALIGNMENT */
+        .new-run-circle { 
+            width: 55px; height: 55px; 
+            background: linear-gradient(145deg, #1b5e20, #32D74B); 
+            border: 2px solid #555; border-radius: 50%; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            cursor: pointer; text-align: center; overflow: hidden;
+        }
+        .new-run-circle span { 
+            color: white; font-weight: 900; line-height: 1; 
+            pointer-events: none; display: block; width: 100%;
+        }
+
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
         .btn-main { width: 85px; height: 85px; }
         .btn-side { width: 50px; height: 50px; background: #2c2c2e; color: #fff; }
@@ -81,7 +94,9 @@
         .chart-wrapper { margin: 15px 25px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; }
         .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
         .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; position: relative; display: flex; align-items: flex-end; justify-content: center; }
-        .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: #000; font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; }
+        
+        /* VERTICAL FONT COLOR CHANGED TO ACCENT BLUE */
+        .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--accent-blue); font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; }
         .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
 
         .history-list-container { padding: 10px 25px 120px 25px; }
@@ -144,7 +159,10 @@
         <div id="accDisplay" class="accuracy-box">GPS SEARCHING...</div>
         <div class="button-row">
             <button class="btn btn-side" id="openHistory" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
-            <div class="new-run-circle" id="newRunBtn"><span>NEW</span></div>
+            <div class="new-run-circle" id="newRunBtn">
+                <span style="font-size: 0.6rem; margin-bottom: 2px;">NEW</span>
+                <span style="font-size: 0.75rem;">RUN</span>
+            </div>
             <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
         </div>
@@ -178,6 +196,7 @@
             <h2>LOCATION</h2>
             <div class="input-box"><input type="text" id="locInput" placeholder="Enter Route"></div>
             <button id="saveLoc" class="btn-compact">SAVE</button>
+            <button onclick="document.getElementById('locModal').style.display='none'" style="background:none; border:none; color:#888; margin-top:15px; font-weight:800;">CANCEL</button>
         </div>
     </div>
 
@@ -187,6 +206,7 @@
             <div class="input-box"><input type="number" id="goalInput" placeholder="KM"></div>
             <div class="input-box"><input type="date" id="dateInput"></div>
             <button id="saveGoal" class="btn-compact">SET GOAL</button>
+            <button onclick="document.getElementById('goalModal').style.display='none'" style="background:none; border:none; color:#888; margin-top:15px; font-weight:800;">CANCEL</button>
         </div>
     </div>
 
@@ -254,7 +274,9 @@
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
             if (lastSpokenDistance % 1 === 0) {
                 let pParts = paceEl.innerText.split("'");
-                speak(`${lastSpokenDistance} kilometers. Pace ${pParts[0]} minutes.`);
+                let pMin = pParts[0];
+                let pSec = pParts[1] ? pParts[1].replace('"', '') : "0";
+                speak(`${lastSpokenDistance} kilometers. Pace ${pMin} minutes ${pSec} seconds.`);
             } else { speak(`${lastSpokenDistance} kilometers.`); }
         }
     }
@@ -264,7 +286,6 @@
         if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); runPath = []; }
         else { speak("Resumed"); }
         isPaused = false; startIcon.innerText = "pause"; stopBtn.classList.remove('hidden');
-        
         timerInterval = setInterval(() => {
             totalSeconds++;
             timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
@@ -362,7 +383,6 @@
         };
     }
 
-    // PDF RESTORED FUNCTION
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
@@ -371,14 +391,10 @@
             if(runs.length === 0) { alert("No runs found."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const accent = [50, 215, 75]; // Neon Green
-            
-            doc.setFontSize(22); doc.setTextColor(...accent); doc.text("CHAN'S RUN PRO REPORT", 14, 20);
+            const accent = [50, 215, 75]; 
+            doc.setFontSize(22); doc.setTextColor(...accent); doc.text("RUN TRACKER REPORT", 14, 20);
             doc.setFontSize(10); doc.setTextColor(100); doc.text(`LIFETIME DISTANCE: ${totalDistance.toFixed(2)} KM`, 14, 28);
-            doc.text(`DATE GENERATED: ${new Date().toLocaleDateString()}`, 14, 33);
-
             const tableData = [...runs].reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
-
             doc.autoTable({
                 startY: 40,
                 head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
@@ -386,12 +402,11 @@
                 headStyles: { fillColor: accent, textColor: [0, 0, 0] },
                 alternateRowStyles: { fillColor: [240, 240, 240] }
             });
-
-            doc.save(`Chan_Run_Report_${new Date().getTime()}.pdf`);
+            doc.save(`Run_Report_${new Date().getTime()}.pdf`);
         };
     };
 
-    function deleteRun(id) { if (confirm("Delete run?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
+    function deleteRun(id) { if (confirm("Delete?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('resetBtn').onclick = () => location.reload();
