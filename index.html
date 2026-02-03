@@ -329,17 +329,33 @@
     }
 
     function checkVoiceMilestones() {
+        // Trigger every 0.5 km
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            if (lastSpokenDistance % 1 === 0) {
-                let pParts = paceEl.innerText.split("'");
+            
+            // Check if it is a full kilometer (e.g., 1.0, 2.0) or half (e.g., 0.5, 1.5)
+            const isFullKm = lastSpokenDistance % 1 === 0;
+
+            if (isFullKm) {
+                // Detailed report for full kilometers
+                let currentTime = timerEl.innerText; 
+                let currentPace = paceEl.innerText.replace('"', ''); 
+                
+                let pParts = currentPace.split("'");
                 let pMin = pParts[0];
-                let pSec = pParts[1] ? pParts[1].replace('"', '') : "0";
-                speak(`${lastSpokenDistance} kilometers. Pace ${pMin} minutes ${pSec} seconds.`);
-            } else { speak(`${lastSpokenDistance} kilometers.`); }
+                let pSec = pParts[1] || "0";
+
+                let tParts = currentTime.split(":");
+                let tMin = parseInt(tParts[0]);
+                let tSec = parseInt(tParts[1]);
+
+                speak(`${lastSpokenDistance} kilometers. Time: ${tMin} minutes ${tSec} seconds. Pace: ${pMin} minutes ${pSec} seconds.`);
+            } else {
+                // Short report for half kilometers
+                speak(`${lastSpokenDistance} kilometers.`);
+            }
         }
     }
-
     function start() {
         requestWakeLock(); // Request WakeLock when starting
         document.getElementById('map').style.display = 'block';
