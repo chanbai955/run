@@ -79,7 +79,7 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* MODALS */
+        /* HISTORY MODAL */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
         .sticky-history-header { position: sticky; top: 0; margin-top: 15px; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
@@ -90,7 +90,7 @@
         .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
         .history-list-container { padding: 10px 25px 120px 25px; }
         .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
-        
+
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
         
@@ -169,7 +169,7 @@
             </div>
             <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
             <div class="history-list-container" id="lapList"></div>
-            <button class="bottom-close-btn" onclick="document.getElementById('historyModal').style.display='none'">Close Notes</button>
+            <button style="width:100%; padding:15px; margin-top:20px; background:#333; border:none; border-radius:12px; color:#fff; font-weight:800;" onclick="document.getElementById('historyModal').style.display='none'">Close Notes</button>
         </div>
     </div>
 
@@ -200,10 +200,11 @@
     let totalSeconds = parseInt(localStorage.getItem('chan_session_seconds')) || 0;
     let runPath = JSON.parse(localStorage.getItem('chan_session_path')) || [];
     let lastSpokenDistance = sessionDistance;
+    let lastPointTime = Date.now();
 
     let watchID, timerInterval, lastCoords = null, db;
     let map, routeLine, currentMarker, streetTiles, satelliteTiles;
-    let mapState = 2; // 0:Street, 1:Sat, 2:Hidden
+    let mapState = 2; 
 
     const dbReq = indexedDB.open("runProEliteDB", 4);
     dbReq.onupgradeneeded = (e) => {
@@ -310,6 +311,8 @@
         document.getElementById('startIcon').innerText = "pause";
         document.getElementById('stopBtn').classList.remove('hidden');
         document.getElementById('headerRunIcon').classList.add('running-pulse');
+        
+        lastPointTime = Date.now();
         timerInterval = setInterval(() => {
             totalSeconds++;
             localStorage.setItem('chan_session_seconds', totalSeconds);
@@ -327,7 +330,11 @@
                 const dLat = (lat - lastCoords.lat) * Math.PI/180, dLon = (lng - lastCoords.lng) * Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                if (d > 0.005) {
+                
+                // ANTI-DRIFT SPEED FILTER
+                const speed = d / ((Date.now() - lastPointTime) / 3600000);
+                
+                if (d > 0.005 && speed > 2.5) {
                     sessionDistance += d;
                     runPath.push([lat, lng]);
                     routeLine.addLatLng([lat, lng]);
@@ -335,6 +342,7 @@
                     localStorage.setItem('chan_session_path', JSON.stringify(runPath));
                     updateDisplay();
                     checkVoiceMilestones();
+                    lastPointTime = Date.now();
                 }
             }
             lastCoords = {lat, lng};
@@ -362,10 +370,20 @@
         });
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
+        
         sessionDistance = 0; totalSeconds = 0; lastSpokenDistance = 0; runPath = []; lastCoords = null;
         localStorage.removeItem('chan_session_dist');
         localStorage.removeItem('chan_session_seconds');
         localStorage.removeItem('chan_session_path');
+        
+        document.getElementById('distance').innerText = "0.00";
+        document.getElementById('timer').innerText = "00:00";
+        document.getElementById('pace').innerText = "0'00\"";
+        document.getElementById('startIcon').innerText = "play_arrow";
+        document.getElementById('stopBtn').classList.add('hidden');
+        document.getElementById('headerRunIcon').classList.remove('running-pulse');
+        routeLine.setLatLngs([]);
+        
         speak("run completed and Saved..Bravo");
         setTimeout(() => location.reload(), 1500);
     };
