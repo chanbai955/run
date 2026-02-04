@@ -47,12 +47,7 @@
         }
 
         .running-pulse {
-            animation: pulse var(--pulse-speed, 1.5s) infinite ease-in-out;
-        }
-
-        .goal-reached {
-            color: #FFD700 !important;
-            animation: goldCelebrate 0.8s infinite ease-in-out !important;
+            animation: pulse 1.5s infinite ease-in-out;
         }
 
         /* MAIN DISPLAY & MAP */
@@ -124,16 +119,9 @@
         .btn-compact { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; cursor: pointer; border: none; margin-top: 10px; }
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         .bottom-close-btn { width: 100%; padding: 15px; margin-top: 20px; background: #333; border: none; border-radius: 12px; color: #fff; font-weight: 800; cursor: pointer; }
-        
-        /* HIDDEN VIDEO FOR WAKE LOCK FALLBACK */
-        #wakeVideo { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
     </style>
 </head>
 <body>
-
-    <video id="wakeVideo" loop muted playsinline>
-        <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-1080p-60fps-30s/master/video.mp4" type="video/mp4">
-    </video>
 
     <div class="header">
         <div class="header-info">
@@ -234,153 +222,122 @@
     </div>
 
 <script>
+    // --- VARIABLES & STATE ---
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
     let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
-    let watchID, timerInterval, sessionDistance = 0, totalSeconds = 0, lastCoords = null, lastPointTime = 0, lastSpokenDistance = 0, db;
-    let isPaused = false;
-    let wakeLock = null; // New WakeLock variable
     
-    let map, routeLine, currentMarker, hMap, hRouteLine, runPath = [];
+    let sessionDistance = parseFloat(localStorage.getItem('chan_session_dist')) || 0;
+    let totalSeconds = parseInt(localStorage.getItem('chan_session_seconds')) || 0;
+    let runPath = JSON.parse(localStorage.getItem('chan_session_path')) || [];
+    let lastSpokenDistance = sessionDistance; 
 
-    const dbReq = indexedDB.open("RunProEliteDB", 2);
+    let watchID, timerInterval, lastCoords = null, lastPointTime = 0, db;
+    let isPaused = true;
+    let wakeLock = null;
+    let map, routeLine, currentMarker, hMap, hRouteLine;
+
+    const distEl = document.getElementById('distance'), 
+          timerEl = document.getElementById('timer'), 
+          paceEl = document.getElementById('pace'), 
+          startBtn = document.getElementById('startBtn'), 
+          stopBtn = document.getElementById('stopBtn'), 
+          startIcon = document.getElementById('startIcon'), 
+          accDisplay = document.getElementById('accDisplay');
+
+    // --- INITIALIZATION ---
+    const dbReq = indexedDB.open("runProEliteDB", 3);
     dbReq.onupgradeneeded = (e) => { 
         db = e.target.result; 
         if(!db.objectStoreNames.contains("runs")) db.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
     };
-    dbReq.onsuccess = (e) => db = e.target.result;
+    dbReq.onsuccess = (e) => { db = e.target.result; };
 
-    const distEl = document.getElementById('distance'), timerEl = document.getElementById('timer'), paceEl = document.getElementById('pace'), 
-          startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn'), 
-          startIcon = document.getElementById('startIcon'), accDisplay = document.getElementById('accDisplay'),
-          headerIcon = document.getElementById('headerRunIcon'), wakeVideo = document.getElementById('wakeVideo');
+    window.onload = () => {
+        initMap();
+        updateDisplay();
+        document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
+        document.getElementById('locDisplay').innerText = runLocation;
+        checkStatus();
 
-    setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
-    document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
-
-    window.onload = () => { updateProgress(); checkStatus(); document.getElementById('locDisplay').innerText = runLocation; initMap(); };
-
-    function speak(text) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
-
-    /* WAKE LOCK LOGIC */
-    async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-            // Fallback: Play tiny video for Safari/iOS
-            wakeVideo.play();
-        } catch (err) { console.log("WakeLock failed: ", err); }
-    }
-
-    function releaseWakeLock() {
-        if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
-        wakeVideo.pause();
-    }
-
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') {
-            wakeLock = await navigator.wakeLock.request('screen');
+        if (totalSeconds > 0) {
+            stopBtn.classList.remove('hidden');
+            updateTimerDisplay();
         }
-    });
+    };
+
+    setInterval(() => { 
+        document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; 
+    }, 1000);
 
     function initMap() {
         map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        routeLine = L.polyline([], {color: '#32D74B', weight: 6, opacity: 0.8}).addTo(map);
+        routeLine = L.polyline(runPath, {color: '#32D74B', weight: 6, opacity: 0.8}).addTo(map);
         currentMarker = L.circleMarker([0, 0], {radius: 8, color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 1}).addTo(map);
+        if(runPath.length > 0) {
+            map.fitBounds(routeLine.getBounds());
+            document.getElementById('map').style.display = 'block';
+        }
     }
 
-    function updateProgress() {
+    // --- CORE FUNCTIONS ---
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+        }
+    }
+
+    function speak(text) { 
+        window.speechSynthesis.cancel(); 
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); 
+    }
+
+    function updateDisplay() {
         distEl.innerText = sessionDistance.toFixed(2);
         let cur = totalDistance + sessionDistance;
         document.getElementById('doneKm').innerText = cur.toFixed(2);
-        
         if (targetGoal > 0) {
-            let percent = (cur / targetGoal) * 100;
             document.getElementById('balKm').innerText = Math.max(targetGoal - cur, 0).toFixed(2);
-            document.getElementById('progressBar').style.width = Math.min(percent, 100) + "%";
-            if (percent >= 100) {
-                headerIcon.classList.add('goal-reached');
-                if (!headerIcon.dataset.celebrated) {
-                    speak("Congratulations! Goal reached.");
-                    headerIcon.dataset.celebrated = "true";
-                }
-            } else {
-                headerIcon.classList.remove('goal-reached');
-                delete headerIcon.dataset.celebrated;
-            }
+            document.getElementById('progressBar').style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
         }
     }
 
-    function updateGpsIcon(accuracy) {
-        const icon = document.getElementById('gpsIcon');
-        if (accuracy < 25) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
-        else { icon.classList.remove('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (SEARCHING)`; accDisplay.style.color = "var(--warning-yellow)"; }
-    }
-
-    function checkStatus() {
-        if (!targetDate || targetGoal <= 0) return;
-        const due = new Date(targetDate).setHours(0,0,0,0);
-        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
-        document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
-        document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
+    function updateTimerDisplay() {
+        const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const secs = (totalSeconds % 60).toString().padStart(2, '0');
+        timerEl.innerText = `${mins}:${secs}`;
     }
 
     function checkVoiceMilestones() {
-        // Trigger every 0.5 km
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
-            
-            // Check if it is a full kilometer (e.g., 1.0, 2.0) or half (e.g., 0.5, 1.5)
-            const isFullKm = lastSpokenDistance % 1 === 0;
-
-            if (isFullKm) {
-                // Detailed report for full kilometers
-                let currentTime = timerEl.innerText; 
-                let currentPace = paceEl.innerText.replace('"', ''); 
-                
-                let pParts = currentPace.split("'");
-                let pMin = pParts[0];
-                let pSec = pParts[1] || "0";
-
-                let tParts = currentTime.split(":");
-                let tMin = parseInt(tParts[0]);
-                let tSec = parseInt(tParts[1]);
-
-                speak(`${lastSpokenDistance} kilometers. Time: ${tMin} minutes ${tSec} seconds. Pace: ${pMin} minutes ${pSec} seconds.`);
-            } else {
-                // Short report for half kilometers
-                speak(`${lastSpokenDistance} kilometers.`);
-            }
+            speak(`${lastSpokenDistance} kilometers.`);
         }
     }
-    function start() {
-        requestWakeLock(); // Request WakeLock when starting
-        document.getElementById('map').style.display = 'block';
-        if (!isPaused) { speak("Running started"); lastPointTime = Date.now(); runPath = []; }
-        else { speak("Resumed"); }
-        
-        isPaused = false; 
-        startIcon.innerText = "pause"; 
-        stopBtn.classList.remove('hidden');
-        headerIcon.classList.add('running-pulse');
 
+    function startRun() {
+        document.getElementById('map').style.display = 'block';
+        document.getElementById('headerRunIcon').classList.add('running-pulse');
+        requestWakeLock();
+        
+        if (totalSeconds === 0) speak("Start Running Chanthiran");
+        else speak("Resumed");
+        
+        isPaused = false;
+        startIcon.innerText = "pause";
+        stopBtn.classList.remove('hidden');
+        lastPointTime = Date.now();
+        
         timerInterval = setInterval(() => {
             totalSeconds++;
-            timerEl.innerText = `${Math.floor(totalSeconds/60).toString().padStart(2,'0')}:${(totalSeconds%60).toString().padStart(2,'0')}`;
-            if(sessionDistance > 0.05) {
+            localStorage.setItem('chan_session_seconds', totalSeconds);
+            updateTimerDisplay();
+            
+            if(sessionDistance > 0.01) {
                 const totalMin = (totalSeconds / 60) / sessionDistance;
-                paceEl.innerText = totalMin < 35 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "0'00\"";
-                if (!headerIcon.classList.contains('goal-reached')) {
-                    let pulseDuration = Math.max(0.4, Math.min(2.0, totalMin / 6)); 
-                    headerIcon.style.setProperty('--pulse-speed', pulseDuration + 's');
-                    if (totalMin <= 6.5) headerIcon.style.color = "var(--neon-green)";
-                    else if (totalMin <= 9) headerIcon.style.color = "var(--accent-blue)";
-                    else if (totalMin <= 12) headerIcon.style.color = "var(--warning-yellow)";
-                    else headerIcon.style.color = "var(--danger-red)";
-                }
+                paceEl.innerText = totalMin < 60 ? `${Math.floor(totalMin)}'${Math.floor((totalMin % 1) * 60).toString().padStart(2, '0')}"` : "0'00\"";
             }
         }, 1000);
 
@@ -397,67 +354,101 @@
                 const dLat = (lat - lastCoords.lat) * Math.PI/180, dLon = (lng - lastCoords.lon) * Math.PI/180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                const speed = d / ((Date.now() - lastPointTime) / 3600000);
                 
-                if (d > 0.002 && speed > 0.5) { 
-                    sessionDistance += d; updateProgress(); checkVoiceMilestones();
-                    lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now();
+                if (d > 0.003) { 
+                    sessionDistance += d;
+                    lastCoords = {lat: lat, lon: lng};
                     runPath.push([lat, lng]);
-                    routeLine.addLatLng([lat, lng]); 
+                    routeLine.addLatLng([lat, lng]);
+                    updateDisplay();
+                    checkVoiceMilestones();
+                    localStorage.setItem('chan_session_dist', sessionDistance);
+                    localStorage.setItem('chan_session_path', JSON.stringify(runPath));
                 }
-            } else { lastCoords = {lat: lat, lon: lng}; lastPointTime = Date.now(); map.setView([lat, lng], 17); runPath.push([lat, lng]); }
-        }, (err) => { console.error(err); }, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000 // Persistent search every 10s
-        });
+            } else { 
+                lastCoords = {lat: lat, lon: lng}; 
+                runPath.push([lat, lng]); 
+            }
+        }, null, {enableHighAccuracy: true});
     }
 
+    function pauseRun() {
+        clearInterval(timerInterval);
+        navigator.geolocation.clearWatch(watchID);
+        isPaused = true;
+        startIcon.innerText = "play_arrow";
+        document.getElementById('headerRunIcon').classList.remove('running-pulse');
+        speak("Paused");
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    }
+
+    // --- EVENT LISTENERS ---
     startBtn.onclick = () => {
-        if (startIcon.innerText === "pause") { 
-            clearInterval(timerInterval); 
-            navigator.geolocation.clearWatch(watchID); 
-            isPaused = true; 
-            startIcon.innerText = "play_arrow"; 
-            headerIcon.classList.remove('running-pulse');
-            releaseWakeLock(); // Release lock when paused
-            speak("Paused"); 
-        }
-        else start();
+        if (startIcon.innerText === "pause") pauseRun();
+        else startRun();
     };
 
     stopBtn.onclick = () => {
-        clearInterval(timerInterval); 
-        navigator.geolocation.clearWatch(watchID);
-        releaseWakeLock(); // Fully release lock when finished
-        totalDistance += sessionDistance; localStorage.setItem('chan_accumulated_km', totalDistance);
-        headerIcon.classList.remove('running-pulse');
-        headerIcon.style.color = "var(--neon-green)";
+        if(!confirm("Finish run?")) return;
+        pauseRun();
+        totalDistance += sessionDistance;
+        localStorage.setItem('chan_accumulated_km', totalDistance);
+        
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ 
-            date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), 
-            pace: paceEl.innerText, duration: timerEl.innerText, location: runLocation, route: runPath 
+            date: document.getElementById('fullDate').innerText, 
+            distance: sessionDistance.toFixed(2), 
+            pace: paceEl.innerText, 
+            duration: timerEl.innerText, 
+            location: runLocation, 
+            route: runPath 
         });
-        speak("Finished"); location.reload();
+
+        localStorage.removeItem('chan_session_dist');
+        localStorage.removeItem('chan_session_seconds');
+        localStorage.removeItem('chan_session_path');
+        
+        speak("Workout complete");
+        setTimeout(() => location.reload(), 1000);
     };
 
-    /* RENDERING & UTILITY FUNCTIONS */
-    function showSavedRoute(runId) {
-        db.transaction("runs").objectStore("runs").get(runId).onsuccess = (e) => {
-            const run = e.target.result;
-            if(!run.route || run.route.length === 0) return alert("No route saved.");
-            document.getElementById('historyMapModal').style.display = 'flex';
-            setTimeout(() => {
-                if(!hMap) {
-                    hMap = L.map('historyMap', { zoomControl: false });
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
-                    hRouteLine = L.polyline([], {color: '#32D74B', weight: 6}).addTo(hMap);
-                }
-                hRouteLine.setLatLngs(run.route);
-                hMap.fitBounds(hRouteLine.getBounds());
-            }, 300);
-        };
+    document.getElementById('resetBtn').onclick = () => location.reload();
+
+    document.getElementById('newRunBtn').onclick = () => {
+        if(confirm("This will clear all data and lifetime distance. Proceed?")) {
+            localStorage.clear();
+            indexedDB.deleteDatabase("runProEliteDB");
+            location.reload();
+        }
+    };
+
+    // --- UI HELPERS ---
+    function updateGpsIcon(accuracy) {
+        const icon = document.getElementById('gpsIcon');
+        if (accuracy < 25) { 
+            icon.classList.add('sig-good'); 
+            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; 
+            accDisplay.style.color = "var(--accent-blue)"; 
+        } else { 
+            icon.classList.remove('sig-good'); 
+            accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (SEARCHING)`; 
+            accDisplay.style.color = "var(--warning-yellow)"; 
+        }
     }
+
+    function checkStatus() {
+        if (!targetDate || targetGoal <= 0) return;
+        const due = new Date(targetDate).setHours(0,0,0,0);
+        const diffDays = Math.ceil((due - new Date().setHours(0,0,0,0)) / 86400000);
+        document.getElementById('balDateDisplay').innerText = `DUE: ${targetDate.split('-').reverse().join('/')}`;
+        document.getElementById('daysLeftDisplay').innerText = diffDays < 0 ? "OVERDUE" : `${diffDays} DAYS LEFT`;
+    }
+
+    // --- HISTORY LOGIC ---
+    document.getElementById('openHistory').onclick = () => {
+        document.getElementById('historyModal').style.display = 'flex';
+        renderHistory();
+    };
 
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
@@ -469,14 +460,13 @@
             const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
             runs.forEach(run => {
                 const bar = document.createElement('div'); bar.className = 'chart-bar';
-                bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
+                bar.style.height = `${Math.max((parseFloat(run.distance) / maxDist) * 100, 5)}%`;
                 bar.innerHTML = `<span class="bar-val">${run.distance} KM</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
                 chart.appendChild(bar);
             });
             runs.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
-                row.innerHTML = `
-                    <div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location}</small></div>
+                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location}</small></div>
                     <div class="history-actions">
                         <span class="material-icons-round" onclick="showSavedRoute(${run.id})" style="color:var(--neon-green); cursor:pointer;">map</span>
                         <span class="material-icons-round" onclick="deleteRun(${run.id})" style="color:var(--danger-red); cursor:pointer;">delete</span>
@@ -486,38 +476,56 @@
         };
     }
 
+    window.showSavedRoute = (runId) => {
+        db.transaction("runs").objectStore("runs").get(runId).onsuccess = (e) => {
+            const run = e.target.result;
+            if(!run.route || run.route.length === 0) return alert("No route data.");
+            document.getElementById('historyMapModal').style.display = 'flex';
+            setTimeout(() => {
+                if(!hMap) {
+                    hMap = L.map('historyMap', { zoomControl: false });
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(hMap);
+                    hRouteLine = L.polyline([], {color: '#32D74B', weight: 6}).addTo(hMap);
+                }
+                hRouteLine.setLatLngs(run.route);
+                hMap.fitBounds(hRouteLine.getBounds());
+            }, 300);
+        };
+    };
+
+    window.deleteRun = (id) => { 
+        if (confirm("Delete this record?")) { 
+            db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; 
+        } 
+    };
+
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
+    document.getElementById('saveLoc').onclick = () => { 
+        localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); 
+        location.reload(); 
+    };
+    document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('saveGoal').onclick = () => { 
+        localStorage.setItem('chan_target_km', document.getElementById('goalInput').value); 
+        localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); 
+        location.reload(); 
+    };
+
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
             const runs = req.result;
-            if(runs.length === 0) { alert("No runs found."); return; }
+            if(runs.length === 0) return alert("No history to export.");
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const accent = [50, 215, 75]; 
-            doc.setFontSize(22); doc.setTextColor(...accent); doc.text("RUN TRACKER REPORT", 14, 20);
-            doc.setFontSize(10); doc.setTextColor(100); doc.text(`LIFETIME DISTANCE: ${totalDistance.toFixed(2)} KM`, 14, 28);
-            const tableData = [...runs].reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
-            doc.autoTable({
-                startY: 40,
-                head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']],
-                body: tableData,
-                headStyles: { fillColor: accent, textColor: [0, 0, 0] },
-                alternateRowStyles: { fillColor: [240, 240, 240] }
-            });
-            doc.save(`Run_Report_${new Date().getTime()}.pdf`);
+            doc.text("RUN TRACKER REPORT", 14, 20);
+            const tableData = runs.reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
+            doc.autoTable({ startY: 30, head: [['Date', 'Distance', 'Time', 'Pace', 'Location']], body: tableData });
+            doc.save('Run_Report.pdf');
         };
     };
-
-    function deleteRun(id) { if (confirm("Delete?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = renderHistory; } }
-    document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
-    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('resetBtn').onclick = () => location.reload();
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Reset all?")) { localStorage.clear(); location.reload(); } };
-    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
-    document.getElementById('saveLoc').onclick = () => { localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); location.reload(); };
-    document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
-    document.getElementById('saveGoal').onclick = () => { localStorage.setItem('chan_target_km', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); };
 </script>
 </body>
 </html>
