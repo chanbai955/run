@@ -378,7 +378,7 @@
         isPaused = true;
         startIcon.innerText = "play_arrow";
         document.getElementById('headerRunIcon').classList.remove('running-pulse');
-        speak("Paused");
+        speak("Run Paused");
         if (wakeLock) { wakeLock.release(); wakeLock = null; }
     }
 
@@ -389,7 +389,7 @@
     };
 
     stopBtn.onclick = () => {
-        if(!confirm("Finish run?")) return;
+        
         pauseRun();
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
@@ -408,7 +408,7 @@
         localStorage.removeItem('chan_session_seconds');
         localStorage.removeItem('chan_session_path');
         
-        speak("Workout complete");
+        speak("Run completed");
         setTimeout(() => location.reload(), 1000);
     };
 
