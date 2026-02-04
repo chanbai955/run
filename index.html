@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Run Tracker Pro</title>
+    <title>Run Tracker </title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -82,7 +82,7 @@
         /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
-        .sticky-history-header { position: sticky; top: 0; margin-top: 15px; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         .chart-wrapper { margin: 15px 25px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; }
         .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
         .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; position: relative; display: flex; align-items: flex-end; justify-content: center; }
@@ -169,7 +169,7 @@
             </div>
             <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
             <div class="history-list-container" id="lapList"></div>
-            <button style="width:100%; padding:15px; margin-top:20px; background:#333; border:none; border-radius:12px; color:#fff; font-weight:800;" onclick="document.getElementById('historyModal').style.display='none'">Close Notes</button>
+            <button style="width:90%; padding:15px; margin: 0 5% 20px 5%; background:#333; border:none; border-radius:12px; color:#fff; font-weight:800;" onclick="document.getElementById('historyModal').style.display='none'">Close Notes</button>
         </div>
     </div>
 
@@ -290,11 +290,20 @@
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
             const isFullKm = lastSpokenDistance % 1 === 0;
+
+            // SPECIAL MOTIVATIONAL PHRASES
+            if (lastSpokenDistance === 5.0) { speak("KM 5. just run"); return; }
+            if (lastSpokenDistance === 10.0) { speak("KM 10. Keep Moving"); return; }
+            if (lastSpokenDistance === 15.0) { speak("KM 15. u are doing good"); return; }
+            if (lastSpokenDistance === 21.0) { speak("KM 21. Run when you can, walk if you have to, crawl if you must; just never give up"); return; }
+
             if (isFullKm) {
                 let t = document.getElementById('timer').innerText.split(":");
                 let p = document.getElementById('pace').innerText.replace('"', '').split("'");
                 speak(`${lastSpokenDistance} kilometers. Total time: ${parseInt(t[0])} minutes ${parseInt(t[1])} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
-            } else { speak(`${lastSpokenDistance} kilometers.`); }
+            } else { 
+                speak(`${lastSpokenDistance} kilometers.`); 
+            }
         }
     }
 
@@ -307,7 +316,7 @@
             speak("Paused");
             return;
         }
-        if (totalSeconds === 0 && sessionDistance === 0) speak("Start to RUN CHANTHIRAN"); else speak("RUn Resumed");
+        if (totalSeconds === 0 && sessionDistance === 0) speak("Enjoy Your RUN "); else speak("run resumed");
         document.getElementById('startIcon').innerText = "pause";
         document.getElementById('stopBtn').classList.remove('hidden');
         document.getElementById('headerRunIcon').classList.add('running-pulse');
@@ -331,7 +340,7 @@
                 const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2;
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
-                // ANTI-DRIFT SPEED FILTER
+                // SPEED FILTER
                 const speed = d / ((Date.now() - lastPointTime) / 3600000);
                 
                 if (d > 0.005 && speed > 2.5) {
@@ -384,8 +393,8 @@
         document.getElementById('headerRunIcon').classList.remove('running-pulse');
         routeLine.setLatLngs([]);
         
-        speak("run completed and Saved..Bravo");
-        setTimeout(() => location.reload(), 1500);
+        speak("Run Completed And Saved - The miracle isn't that you finished. The miracle is that you had the courage to start");
+        setTimeout(() => location.reload(), 3000); // Longer delay to finish long quote
     };
 
     document.getElementById('shareBtn').onclick = () => {
@@ -421,6 +430,13 @@
         };
     }
 
+    window.deleteRun = (id) => { 
+        if(confirm("Delete?")) { 
+            const tx = db.transaction("runs", "readwrite");
+            tx.objectStore("runs").delete(id).onsuccess = () => { renderHistory(); };
+        }
+    };
+
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
@@ -452,14 +468,13 @@
         location.reload();
     };
 
-    window.deleteRun = (id) => { if(confirm("Delete?")) { db.transaction("runs", "readwrite").objectStore("runs").delete(id); location.reload(); }};
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     
     document.getElementById('newRunBtn').onclick = () => { 
         if(confirm("Wipe all data?")) { 
-            speak("new run");
+            speak("New Run - You don’t stop running because you get old. You get old because you stop running");
             localStorage.clear(); 
-            location.reload(); 
+            setTimeout(() => { location.reload(); }, 4000); 
         }
     };
 </script>
