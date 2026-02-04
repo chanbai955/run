@@ -62,7 +62,7 @@
         .stat-box h2 { margin: 0; font-size: 2rem; }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
-        /* CONTROLS BAR */
+        /* CONTROLS */
         .controls-bar { background: #121212; padding: 20px 20px 140px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; z-index: 100; }
         .goal-container { width: 90%; margin-bottom: 5px; }
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; margin-top: 8px; }
@@ -72,19 +72,28 @@
         .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border: 2px solid #555; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; text-align: center; }
         .new-run-circle span { color: white; font-weight: 900; line-height: 1; pointer-events: none; }
         
-        .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.3s ease; }
+        .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
         .btn-main { width: 85px; height: 85px; }
         .btn-side { width: 50px; height: 50px; background: #2c2c2e; color: #fff; }
         .start { background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
+        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
+        .sticky-history-header { position: sticky; top: 0; margin-top: 15px; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .chart-wrapper { margin: 15px 25px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; }
+        .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
+        .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+        .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--accent-blue); font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; }
+        .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
+        .history-list-container { padding: 10px 25px 120px 25px; }
+        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; border-left: 4px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
+        
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
         
-        /* Map Filters */
         .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         .satellite-view .leaflet-tile-container { filter: none !important; }
     </style>
@@ -151,11 +160,16 @@
 
     <div id="historyModal" class="modal">
         <div class="quick-note">
-            <div style="padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;">
+            <div class="sticky-history-header">
                 <h2 style="color:var(--neon-green); margin:0;">RUN NOTES</h2>
-                <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
+                <div style="display:flex; gap:20px; align-items:center;">
+                    <span id="exportPdf" class="material-icons-round" style="cursor:pointer; color:var(--danger-red); font-size:28px;">picture_as_pdf</span>
+                    <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
+                </div>
             </div>
-            <div id="lapList" style="padding: 20px 0 100px 0;"></div>
+            <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
+            <div class="history-list-container" id="lapList"></div>
+            <button class="bottom-close-btn" onclick="document.getElementById('historyModal').style.display='none'">Close Notes</button>
         </div>
     </div>
 
@@ -189,7 +203,7 @@
 
     let watchID, timerInterval, lastCoords = null, db;
     let map, routeLine, currentMarker, streetTiles, satelliteTiles;
-    let mapState = 2; 
+    let mapState = 2; // 0:Street, 1:Sat, 2:Hidden
 
     const dbReq = indexedDB.open("runProEliteDB", 4);
     dbReq.onupgradeneeded = (e) => {
@@ -220,32 +234,24 @@
         mapState = (mapState + 1) % 3;
         const mapEl = document.getElementById('map');
         const icon = this.querySelector('.material-icons-round');
-        
         icon.style.transition = 'transform 0.5s ease';
         icon.style.transform = `rotate(${360 * (mapState + 1)}deg)`;
 
-        sessionDistance = parseFloat(localStorage.getItem('chan_session_dist')) || 0;
-        totalSeconds = parseInt(localStorage.getItem('chan_session_seconds')) || 0;
-        runPath = JSON.parse(localStorage.getItem('chan_session_path')) || [];
-        updateDisplay();
-
-        if (mapState === 0) { 
+        if (mapState === 0) {
             mapEl.style.display = 'block';
             mapEl.classList.remove('satellite-view');
             map.removeLayer(satelliteTiles);
             streetTiles.addTo(map);
             if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); else map.setZoom(15);
-        } else if (mapState === 1) { 
+        } else if (mapState === 1) {
             mapEl.style.display = 'block';
             mapEl.classList.add('satellite-view');
             map.removeLayer(streetTiles);
             satelliteTiles.addTo(map);
-            // SATELLITE AUTO-ZOOM
             if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); else map.setZoom(18);
-        } else { 
+        } else {
             mapEl.style.display = 'none';
         }
-
         if (mapState !== 2) setTimeout(() => { map.invalidateSize(); }, 200);
     };
 
@@ -309,13 +315,18 @@
             localStorage.setItem('chan_session_seconds', totalSeconds);
             updateDisplay();
         }, 1000);
+
         watchID = navigator.geolocation.watchPosition(pos => {
             const { latitude: lat, longitude: lng, accuracy } = pos.coords;
             currentMarker.setLatLng([lat, lng]);
             map.panTo([lat, lng]);
+            updateGpsIcon(accuracy);
             if (accuracy > 30) return;
             if (lastCoords) {
-                const d = map.distance([lastCoords.lat, lastCoords.lng], [lat, lng]) / 1000;
+                const R = 6371;
+                const dLat = (lat - lastCoords.lat) * Math.PI/180, dLon = (lng - lastCoords.lng) * Math.PI/180;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lastCoords.lat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2;
+                const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 if (d > 0.005) {
                     sessionDistance += d;
                     runPath.push([lat, lng]);
@@ -330,12 +341,17 @@
         }, null, {enableHighAccuracy: true});
     };
 
+    function updateGpsIcon(accuracy) {
+        const icon = document.getElementById('gpsIcon');
+        const accDisplay = document.getElementById('accDisplay');
+        if (accuracy < 25) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
+        else { icon.classList.remove('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (SEARCHING)`; accDisplay.style.color = "var(--warning-yellow)"; }
+    }
+
     document.getElementById('stopBtn').onclick = async () => {
         if(!confirm("Finish and Save? Everything will reset to zero.")) return;
-        
         clearInterval(timerInterval);
         if(watchID) navigator.geolocation.clearWatch(watchID);
-        
         const tx = db.transaction("runs", "readwrite");
         tx.objectStore("runs").add({ 
             date: document.getElementById('fullDate').innerText, 
@@ -344,23 +360,12 @@
             pace: document.getElementById('pace').innerText,
             location: runLocation, route: runPath 
         });
-
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
-        
         sessionDistance = 0; totalSeconds = 0; lastSpokenDistance = 0; runPath = []; lastCoords = null;
         localStorage.removeItem('chan_session_dist');
         localStorage.removeItem('chan_session_seconds');
         localStorage.removeItem('chan_session_path');
-        
-        document.getElementById('distance').innerText = "0.00";
-        document.getElementById('timer').innerText = "00:00";
-        document.getElementById('pace').innerText = "0'00\"";
-        document.getElementById('startIcon').innerText = "play_arrow";
-        document.getElementById('stopBtn').classList.add('hidden');
-        document.getElementById('headerRunIcon').classList.remove('running-pulse');
-        routeLine.setLatLngs([]);
-        
         speak("run completed and Saved..Bravo");
         setTimeout(() => location.reload(), 1500);
     };
@@ -372,17 +377,44 @@
 
     document.getElementById('openHistory').onclick = () => {
         document.getElementById('historyModal').style.display = 'flex';
+        renderHistory();
+    };
+
+    function renderHistory() {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
-            const list = document.getElementById('lapList'); list.innerHTML = "";
-            req.result.reverse().forEach(run => {
-                const item = document.createElement('div');
-                item.className = "history-item";
-                item.innerHTML = `<div><b>${run.date}</b><br>${run.distance} KM | ${run.duration}</div>
-                                  <span class="material-icons-round" style="color:var(--danger-red); cursor:pointer;" onclick="deleteRun(${run.id})">delete</span>`;
-                list.appendChild(item);
+            const list = document.getElementById('lapList'), chart = document.getElementById('runChart');
+            list.innerHTML = ""; chart.innerHTML = "";
+            const runs = req.result;
+            const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
+            runs.forEach(run => {
+                const bar = document.createElement('div'); bar.className = 'chart-bar';
+                bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
+                bar.innerHTML = `<span class="bar-val">${run.distance} KM</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
+                chart.appendChild(bar);
             });
+            runs.reverse().forEach(run => {
+                const row = document.createElement('div'); row.className = "history-item";
+                row.innerHTML = `<div class="history-content"><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location}</small></div>
+                                  <span class="material-icons-round" onclick="deleteRun(${run.id})" style="color:var(--danger-red); cursor:pointer;">delete</span>`;
+                list.appendChild(row);
+            });
+        };
+    }
+
+    document.getElementById('exportPdf').onclick = () => {
+        const tx = db.transaction("runs", "readonly");
+        const req = tx.objectStore("runs").getAll();
+        req.onsuccess = () => {
+            const runs = req.result;
+            if(runs.length === 0) return alert("No runs found.");
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("RUN TRACKER REPORT", 14, 20);
+            const tableData = runs.reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location]);
+            doc.autoTable({ startY: 30, head: [['Date', 'Distance', 'Duration', 'Pace', 'Location']], body: tableData });
+            doc.save(`Run_Report_${new Date().getTime()}.pdf`);
         };
     };
 
