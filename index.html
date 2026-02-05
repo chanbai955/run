@@ -44,7 +44,6 @@
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
         .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; font-size: 1rem; }
-        .modal-card h3 { margin-top: 0; color: var(--neon-green); }
     </style>
 </head>
 <body onclick="resetIdleTimer()">
@@ -125,7 +124,7 @@
         <h3 id="modalTitle">MANUAL ENTRY</h3>
         <input type="hidden" id="editId">
         <input type="number" id="manualDist" placeholder="Distance (KM)" step="0.01">
-        <input type="text" id="manualTime" placeholder="MM:SS">
+        <input type="text" id="manualTime" placeholder="HH:MM:SS">
         <input type="text" id="manualLoc" placeholder="Route Name">
         <input type="date" id="manualDate">
         <button onclick="saveManualEntry()" style="background:var(--neon-green); color:black; border:none; padding:12px; border-radius:10px; width:100%; font-weight:bold; cursor:pointer;">SAVE RUN</button>
@@ -159,7 +158,7 @@ let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 let targetDate = localStorage.getItem('chan_target_date') || "";
 
-const dbReq = indexedDB.open("ChanthiranDB", 28);
+const dbReq = indexedDB.open("ChanthiranDB", 29);
 dbReq.onupgradeneeded = (e) => {
     let db = e.target.result;
     if(db.objectStoreNames.contains("runs")) db.deleteObjectStore("runs");
@@ -222,9 +221,9 @@ function checkMilestones() {
         if (currentMilestone === 5) { speak("5 kilometers. Just run."); return; }
         if (currentMilestone === 10) { speak("10 kilometers. Keep moving."); return; }
         if (currentMilestone % 1 === 0) {
-            let t = document.getElementById('timer').innerText.split(':');
-            let p = document.getElementById('pace').innerText.replace('"', '').split("'");
-            speak(`${currentMilestone} kilometers. Time: ${parseInt(t[0])} minutes ${t[1]} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
+            let t = document.getElementById('timer').innerText;
+            let p = document.getElementById('pace').innerText;
+            speak(`${currentMilestone} kilometers. Time: ${t}. Pace: ${p}.`);
         } else { speak(`${currentMilestone} kilometers.`); }
     }
 }
@@ -290,16 +289,20 @@ function saveManualEntry() {
     const editId = document.getElementById('editId').value;
     const dateStr = dateInput ? new Date(dateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
 
-    if(!d || !t.includes(':')) return alert("Enter valid KM and Duration (MM:SS)");
+    if(!d || !t.includes(':')) return alert("Enter valid KM and Time (HH:MM:SS)");
+
     const parts = t.split(':').map(Number);
-    const pMin = ((parts[0]*60)+parts[1])/60/d;
+    let totalSecs = 0;
+    if(parts.length === 3) totalSecs = (parts[0]*3600)+(parts[1]*60)+parts[2];
+    else if(parts.length === 2) totalSecs = (parts[0]*60)+parts[1];
+
+    const pMin = (totalSecs/60)/d;
     const pace = `${Math.floor(pMin)}'${Math.floor((pMin%1)*60).toString().padStart(2,'0')}"`;
 
     const tx = db.transaction("runs", "readwrite");
     const store = tx.objectStore("runs");
 
     if (editId) {
-        // EDIT EXISTING
         store.get(parseInt(editId)).onsuccess = (e) => {
             const oldDist = parseFloat(e.target.result.distance);
             const newData = { ...e.target.result, date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l };
@@ -310,7 +313,6 @@ function saveManualEntry() {
             };
         };
     } else {
-        // NEW MANUAL
         store.add({ date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l + " (Manual)", splits: [] }).onsuccess = () => {
             totalAccumulated += d; localStorage.setItem('chan_total', totalAccumulated);
             location.reload();
@@ -326,10 +328,8 @@ function editRun(id) {
         document.getElementById('manualDist').value = run.distance;
         document.getElementById('manualTime').value = run.duration;
         document.getElementById('manualLoc').value = run.location;
-        
-        const dateParts = run.date.split('/');
-        document.getElementById('manualDate').value = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-        
+        const dParts = run.date.split('/');
+        document.getElementById('manualDate').value = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
         document.getElementById('manualModal').style.display = 'flex';
     };
 }
@@ -337,7 +337,6 @@ function editRun(id) {
 function closeManualModal() {
     document.getElementById('manualModal').style.display = 'none';
     document.getElementById('editId').value = "";
-    document.getElementById('modalTitle').innerText = "MANUAL ENTRY";
     document.getElementById('manualDist').value = "";
     document.getElementById('manualTime').value = "";
     document.getElementById('manualLoc').value = "";
@@ -351,10 +350,9 @@ function deleteRun(id) {
         store.get(id).onsuccess = (e) => {
             const run = e.target.result;
             if (run) {
-                const dist = parseFloat(run.distance);
+                const d = parseFloat(run.distance);
                 store.delete(id).onsuccess = () => {
-                    totalAccumulated -= dist;
-                    localStorage.setItem('chan_total', totalAccumulated);
+                    totalAccumulated -= d; localStorage.setItem('chan_total', totalAccumulated);
                     renderHistory(); updateProgress();
                     document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
                 };
@@ -368,16 +366,14 @@ function renderHistory() {
     list.innerHTML = ""; chart.innerHTML = "";
     db.transaction("runs", "readonly").objectStore("runs").getAll().onsuccess = e => {
         const runs = e.target.result;
-        const recentRuns = runs.slice(-15).map(r => parseFloat(r.distance));
-        const maxDist = Math.max(...recentRuns) || 1;
-        
-        runs.slice(-15).forEach(r => {
+        const rec = runs.slice(-15);
+        const max = Math.max(...rec.map(r => parseFloat(r.distance))) || 1;
+        rec.forEach(r => {
             const bar = document.createElement('div'); bar.className = 'chart-bar';
-            bar.style.height = `${(parseFloat(r.distance)/maxDist) * 100}%`;
+            bar.style.height = `${(parseFloat(r.distance)/max) * 100}%`;
             bar.innerHTML = `<span class="bar-label">${r.distance}</span>`;
             chart.appendChild(bar);
         });
-        
         runs.reverse().forEach(r => {
             const div = document.createElement('div'); div.className = "history-item";
             div.innerHTML = `<b>${r.date}</b> | ${r.distance}KM | ${r.duration}<br><small>${r.location}</small>
@@ -396,8 +392,8 @@ async function generateAndProcessPdf(mode) {
         const runs = e.target.result; const { jsPDF } = window.jspdf; const doc = new jsPDF();
         doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
         doc.setFontSize(14); doc.setTextColor(0); doc.text(`${event.toUpperCase()}`, 14, 30);
-        const totalDist = runs.reduce((acc, run) => acc + parseFloat(run.distance), 0).toFixed(2);
-        doc.autoTable({ startY: 35, head: [['Statistic', 'Value']], body: [['Total Distance', `${totalDist} KM`], ['Sessions', runs.length]], headStyles: { fillColor: [50, 215, 75] } });
+        const tot = runs.reduce((acc, run) => acc + parseFloat(run.distance), 0).toFixed(2);
+        doc.autoTable({ startY: 35, head: [['Statistic', 'Value']], body: [['Total Distance', `${tot} KM`], ['Sessions', runs.length]], headStyles: { fillColor: [50, 215, 75] } });
         doc.autoTable({ startY: doc.lastAutoTable.finalY + 10, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]), headStyles: { fillColor: [10, 132, 255] } });
         const ph = doc.internal.pageSize.height;
         doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text("Chanthiran Sivaperuman", 14, ph - 20);
@@ -427,12 +423,13 @@ function updateProgress() {
 function calcDist(l1, o1, l2, o2) { const R = 6371; const dL = (l2-l1)*Math.PI/180; const dO = (o2-o1)*Math.PI/180; const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
 function updateUI() {
     document.getElementById('distance').innerText = sessionDistance.toFixed(2);
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
     const s = (totalSeconds % 60).toString().padStart(2, '0');
-    document.getElementById('timer').innerText = `${m}:${s}`;
+    document.getElementById('timer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
     if(sessionDistance > 0.01) {
-        let p = (totalSeconds/60)/sessionDistance;
-        document.getElementById('pace').innerText = `${Math.floor(p)}'${Math.floor((p%1)*60).toString().padStart(2,'0')}"`;
+        let pMin = (totalSeconds/60)/sessionDistance;
+        document.getElementById('pace').innerText = `${Math.floor(pMin)}'${Math.floor((pMin%1)*60).toString().padStart(2,'0')}"`;
     }
 }
 </script>
