@@ -30,20 +30,21 @@
         .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #2c2c2e; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .btn-main { width: 80px; height: 80px; background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red) !important; color: #fff; }
+        .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; }
         #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: flex-end; }
-        .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 80vh; overflow-y: auto; padding-bottom: 50px; }
+        .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; padding-bottom: 50px; }
         .history-item { padding: 15px; border-bottom: 1px solid #333; position: relative; }
-        .split-details { font-family: monospace; font-size: 0.8rem; color: var(--neon-green); margin-top: 5px; }
+        .history-item .del-btn { position: absolute; right: 20px; top: 20px; color: var(--danger-red); cursor: pointer; }
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
         .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; }
         .hidden { display: none; }
     </style>
 </head>
-<body>
+<body onclick="resetIdleTimer()">
 
-<div id="pocketLockOverlay" ondblclick="this.style.display='none'">
+<div id="pocketLockOverlay" ondblclick="unlockPocket()">
     <span class="material-icons-round" style="font-size: 5rem; color: #333;">lock</span>
     <p style="color: #444; font-weight: 800;">DOUBLE-TAP TO UNLOCK</p>
 </div>
@@ -55,7 +56,7 @@
     </div>
     <div style="text-align: center;">
         <div class="app-title">Chanthiran</div>
-        <div style="font-size: 0.5rem; letter-spacing: 2px;">PRO TRACKER</div>
+        <div style="font-size: 0.55rem; letter-spacing: 2px; opacity: 0.7;">RUN TRACKER PRO</div>
     </div>
     <button onclick="toggleMap()" class="btn" style="width:40px; height:40px;"><span class="material-icons-round">map</span></button>
 </div>
@@ -75,53 +76,45 @@
 </div>
 
 <div class="controls-bar">
-    <div style="width:100%; display:flex; justify-content: space-between; font-size: 0.7rem;">
-        <span>DONE: <b id="doneKm">0.00</b></span>
+    <div style="width:100%; display:flex; justify-content: space-between; font-size: 0.75rem; font-weight: 800;">
+        <span><span class="material-icons-round" style="font-size:14px; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
         <span>GOAL: <b id="goalVal">0.00</b></span>
     </div>
     <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
     
-    <div style="display:flex; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:5px; cursor:pointer;" onclick="document.getElementById('locModal').style.display='flex'">
-        <span class="material-icons-round" style="font-size:16px;">place</span>
+    <div style="display:flex; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:8px; cursor:pointer;" onclick="document.getElementById('locModal').style.display='flex'">
+        <span class="material-icons-round" style="font-size:18px;">edit</span>
         <b id="locDisplay" style="margin-left:5px;">SET ROUTE</b>
     </div>
 
     <div class="button-row">
         <button class="btn" onclick="document.getElementById('pocketLockOverlay').style.display='flex'"><span class="material-icons-round">screen_lock_portrait</span></button>
-        <button class="btn" onclick="document.getElementById('manualModal').style.display='flex'"><span class="material-icons-round">edit_note</span></button>
         <button class="btn" onclick="openHistory()"><span class="material-icons-round">analytics</span></button>
-        <button id="startBtn" class="btn btn-main" onclick="toggleStart()"><span class="material-icons-round" id="startIcon" style="font-size:2.5rem;">play_arrow</span></button>
-        <button id="stopBtn" class="btn btn-main stop hidden" onclick="stopAndSave()"><span class="material-icons-round" style="font-size:2.5rem;">stop</span></button>
+        <div class="new-run-circle" onclick="resetAll()">
+            <span style="font-size: 0.6rem; color:#fff; font-weight:900;">NEW</span>
+            <span style="font-size: 0.7rem; color:#fff; font-weight:900;">RUN</span>
+        </div>
+        <button id="startBtn" class="btn btn-main" onclick="toggleStart()"><span class="material-icons-round" id="startIcon" style="font-size:3rem;">play_arrow</span></button>
+        <button id="stopBtn" class="btn btn-main stop hidden" onclick="stopAndSave()"><span class="material-icons-round" style="font-size:3rem;">stop</span></button>
     </div>
 </div>
 
 <div id="historyModal" class="modal">
     <div class="modal-content">
-        <div style="padding:20px; display:flex; justify-content:space-between; align-items:center; sticky; top:0; background:#1c1c1e;">
+        <div style="padding:25px; display:flex; justify-content:space-between; align-items:center; position: sticky; top:0; background:#1c1c1e; z-index:100;">
             <h2 style="margin:0; color:var(--neon-green);">HISTORY</h2>
-            <div style="display:flex; gap:15px;">
-                <span class="material-icons-round" onclick="sharePdf()" style="color:var(--accent-blue); cursor:pointer;">share</span>
-                <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'">close</span>
+            <div style="display:flex; gap:20px;">
+                <span class="material-icons-round" onclick="sharePdf()" style="color:var(--danger-red); cursor:pointer; font-size:30px;">picture_as_pdf</span>
+                <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'" style="font-size:30px; cursor:pointer;">close</span>
             </div>
         </div>
         <div id="lapList"></div>
     </div>
 </div>
 
-<div id="manualModal" class="standard-modal">
-    <div class="modal-card">
-        <h3>MANUAL LOG</h3>
-        <input type="number" id="mDist" placeholder="Distance (KM)">
-        <input type="text" id="mTime" placeholder="Time (MM:SS)">
-        <input type="text" id="mLoc" placeholder="Route Name">
-        <button onclick="saveManual()" style="background:var(--accent-blue);">SAVE</button>
-        <button onclick="this.parentElement.parentElement.style.display='none'" style="background:transparent; color:#888;">CANCEL</button>
-    </div>
-</div>
-
 <div id="locModal" class="standard-modal">
     <div class="modal-card">
-        <h3>SET ROUTE</h3>
+        <h3>ROUTE NAME</h3>
         <input type="text" id="locInput" placeholder="Enter name">
         <button onclick="updateLoc()">SAVE</button>
     </div>
@@ -129,23 +122,22 @@
 
 <div id="goalModal" class="standard-modal">
     <div class="modal-card">
-        <h3>SET GOAL</h3>
-        <input type="number" id="goalInput" placeholder="KM Target">
+        <h3>SET TARGET KM</h3>
+        <input type="number" id="goalInput" placeholder="KM">
         <button onclick="updateGoal()">SAVE</button>
     </div>
 </div>
 
 <script>
 let sessionDistance = 0, totalSeconds = 0, sessionSplits = [], lastCoords = null, watchID, timerInterval;
-let db, map, routeLine, currentMarker, mapState = 0;
+let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer;
 let totalAccumulated = parseFloat(localStorage.getItem('chan_total')) || 0;
 let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 
-// DB Setup
-const req = indexedDB.open("ChanthiranDB", 10);
-req.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
-req.onsuccess = (e) => { db = e.target.result; };
+const dbReq = indexedDB.open("ChanthiranDB", 12);
+dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
+dbReq.onsuccess = (e) => { db = e.target.result; };
 
 window.onload = () => {
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
@@ -164,21 +156,41 @@ function initMap() {
     currentMarker = L.circleMarker([0, 0], {radius: 7, color: '#0A84FF', fillOpacity: 1}).addTo(map);
 }
 
-function toggleMap() { 
-    mapState = !mapState; 
-    document.getElementById('map').style.display = mapState ? 'block' : 'none'; 
-    if(mapState) map.invalidateSize();
+function speak(text) {
+    window.speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(msg);
+}
+
+function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    if(isRunning) {
+        idleTimer = setTimeout(() => {
+            document.getElementById('pocketLockOverlay').style.display = 'flex';
+        }, 30000); // Auto-lock after 30 seconds
+    }
+}
+
+function unlockPocket() {
+    document.getElementById('pocketLockOverlay').style.display = 'none';
+    resetIdleTimer();
 }
 
 function toggleStart() {
     const icon = document.getElementById('startIcon');
     if(icon.innerText === "play_arrow") {
         icon.innerText = "pause";
+        isRunning = true;
         document.getElementById('stopBtn').classList.remove('hidden');
+        speak(totalSeconds === 0 ? "Enjoy your run Chanthiran" : "Resuming run");
         startTracking();
+        resetIdleTimer();
     } else {
         icon.innerText = "play_arrow";
+        isRunning = false;
+        speak("Run paused");
         clearInterval(timerInterval);
+        clearTimeout(idleTimer);
         navigator.geolocation.clearWatch(watchID);
     }
 }
@@ -190,16 +202,16 @@ function startTracking() {
         document.getElementById('accDisplay').innerText = Math.round(accuracy) + "m";
         document.getElementById('gpsIcon').classList.toggle('sig-good', accuracy < 20);
         currentMarker.setLatLng([lat, lng]);
-        if(mapState) map.panTo([lat, lng]);
 
-        if(accuracy < 40 && lastCoords) {
+        if(accuracy < 30 && lastCoords) {
             const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
-            if(d > 0.001) {
+            if(d > 0.005) { 
                 sessionDistance += d;
                 routeLine.addLatLng([lat, lng]);
-                let nextKm = sessionSplits.length + 1;
-                if(sessionDistance >= nextKm) {
-                    sessionSplits.push({ km: nextKm, time: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText });
+                let nextKm = Math.floor(sessionDistance);
+                if(nextKm > sessionSplits.length) {
+                    sessionSplits.push({ km: nextKm, time: document.getElementById('timer').innerText });
+                    speak(`${nextKm} kilometers completed.`);
                 }
                 updateUI();
             }
@@ -208,47 +220,40 @@ function startTracking() {
     }, null, { enableHighAccuracy: true });
 }
 
+function stopAndSave() {
+    if(!confirm("Finish and save?")) return;
+    isRunning = false;
+    clearTimeout(idleTimer);
+    const data = { date: new Date().toLocaleDateString('en-GB'), distance: sessionDistance.toFixed(2), duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
+    db.transaction("runs", "readwrite").objectStore("runs").add(data).onsuccess = () => {
+        totalAccumulated += sessionDistance;
+        localStorage.setItem('chan_total', totalAccumulated);
+        speak(`Run complete Chanthiran. Activity saved.`);
+        location.reload();
+    };
+}
+
 async function sharePdf() {
-    const event = prompt("Event Name:", "Official Run Report") || "Official Run Report";
+    const event = prompt("Event Name:", "Official Run Report") || "Run Report";
     const tx = db.transaction("runs", "readonly");
     const runs = await new Promise(r => tx.objectStore("runs").getAll().onsuccess = e => r(e.target.result));
-    
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
     doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
-    doc.setFontSize(14); doc.setTextColor(0); doc.text(`EVENT: ${event.toUpperCase()}`, 14, 30);
-    doc.setDrawColor(50, 215, 75); doc.rect(14, 35, 182, 18); doc.text(`Total Cumulative: ${totalAccumulated.toFixed(2)} KM`, 20, 47);
-
-    doc.autoTable({ 
-        startY: 60, 
-        head: [['Date', 'KM', 'Time', 'Pace', 'Route']], 
-        body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location])
-    });
-
-    const pages = doc.internal.getNumberOfPages();
-    doc.setPage(pages);
+    doc.setFontSize(14); doc.setTextColor(0); doc.text(`OFFICIAL: ${event.toUpperCase()}`, 14, 30);
+    doc.autoTable({ startY: 40, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]) });
     doc.text("__________________________", 14, 275);
-    doc.setFont("helvetica", "bold"); doc.text("Chanthiran Sivaperuman", 14, 282);
-
+    doc.text("Chanthiran Sivaperuman", 14, 282);
+    
     const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
-    const file = new File([blob], "Chanthiran_Report.pdf", { type: 'application/pdf' });
-
+    const file = new File([blob], "Report.pdf", { type: 'application/pdf' });
     if(navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Run Report' });
     } else { doc.save("Report.pdf"); }
 }
 
-function stopAndSave() {
-    if(!confirm("Save Run?")) return;
-    const data = { date: new Date().toLocaleDateString('en-GB'), distance: sessionDistance.toFixed(2), duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
-    db.transaction("runs", "readwrite").objectStore("runs").add(data).onsuccess = () => {
-        totalAccumulated += sessionDistance;
-        localStorage.setItem('chan_total', totalAccumulated);
-        location.reload();
-    };
-}
-
+function deleteRun(id) { if(confirm("Delete run?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => openHistory(); }
+function resetAll() { if(confirm("Start New Season? Clears everything!")) { localStorage.clear(); indexedDB.deleteDatabase("ChanthiranDB"); location.reload(); } }
 function openHistory() {
     document.getElementById('historyModal').style.display = 'flex';
     const list = document.getElementById('lapList'); list.innerHTML = "";
@@ -256,24 +261,16 @@ function openHistory() {
         e.target.result.reverse().forEach(r => {
             const div = document.createElement('div'); div.className = "history-item";
             div.innerHTML = `<b>${r.date}</b> | ${r.distance}KM | ${r.duration}<br><small>${r.location}</small>
-            <div class="split-details">${r.splits.map(s => `KM${s.km}: ${s.time}`).join(' | ')}</div>`;
+            <span class="material-icons-round del-btn" onclick="deleteRun(${r.id})">delete</span>`;
             list.appendChild(div);
         });
     };
 }
-
-function saveManual() {
-    const d = parseFloat(document.getElementById('mDist').value);
-    const t = document.getElementById('mTime').value;
-    const l = document.getElementById('mLoc').value || "Manual";
-    if(!d || !t) return;
-    db.transaction("runs", "readwrite").objectStore("runs").add({ date: new Date().toLocaleDateString('en-GB'), distance: d.toFixed(2), duration: t, pace: "N/A", location: l, splits: [] }).onsuccess = () => {
-        totalAccumulated += d;
-        localStorage.setItem('chan_total', totalAccumulated);
-        location.reload();
-    };
+function toggleMap() { 
+    mapState = !mapState; 
+    document.getElementById('map').style.display = mapState ? 'block' : 'none'; 
+    if(mapState) map.invalidateSize();
 }
-
 function updateLoc() { localStorage.setItem('chan_loc', document.getElementById('locInput').value); location.reload(); }
 function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); location.reload(); }
 function updateProgress() { if(targetGoal > 0) document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; }
