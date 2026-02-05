@@ -12,42 +12,33 @@
     <style>
         :root { --neon-green: #32D74B; --accent-blue: #0A84FF; --danger-red: #FF453A; --card-bg: #1c1c1e; --warning-yellow: #FFCC00; }
         body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
         #liveClock { font-size: 1rem; font-weight: 800; opacity: 0.8; }
         .app-title { color: var(--neon-green); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0; }
-        
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         .main-stat { font-size: clamp(6.5rem, 20vw, 8.5rem); font-weight: 900; margin: 0; background: linear-gradient(180deg, #fff 30%, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; z-index: 10; }
-        
         .label-row { display: flex; align-items: center; gap: 10px; z-index: 10; }
         #accDisplay { font-size: 0.7rem; color: #444; font-weight: 900; }
         .sig-good { color: var(--accent-blue) !important; }
-        
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; text-align: center; z-index: 10; margin-top: 15px; }
         .controls-bar { background: #121212; padding: 20px 20px 100px 20px; border-radius: 40px 40px 0 0; border-top: 1px solid #222; z-index: 100; }
-        
         .progress-bg { width: 90%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 10px 0;}
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s; }
-
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 20px; }
         .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #2c2c2e; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .btn-main { width: 80px; height: 80px; background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red) !important; color: #fff; }
         .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; }
-        
         #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: flex-end; }
         .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; padding-bottom: 50px; }
         .history-item { padding: 15px; border-bottom: 1px solid #333; position: relative; }
         .history-item .del-btn { position: absolute; right: 20px; top: 20px; color: var(--danger-red); cursor: pointer; }
-        
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
         .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; }
-        .hidden { display: none; }
     </style>
 </head>
 <body onclick="resetIdleTimer()">
@@ -87,14 +78,11 @@
         <span><span class="material-icons-round" style="font-size:16px; vertical-align:middle; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
         <span>BAL: <b id="balKm">0.00</b></span>
     </div>
-    
     <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
-
     <div style="width:90%; display:flex; justify-content: space-between; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:5px;">
         <span onclick="document.getElementById('locModal').style.display='flex'" style="cursor:pointer;"><span class="material-icons-round" style="font-size:16px; vertical-align:middle;">place</span> <b id="locDisplay">SET ROUTE</b></span>
         <span id="daysDisplay" style="color:var(--warning-yellow); font-weight:800;">0 DAYS LEFT</span>
     </div>
-
     <div class="button-row">
         <button class="btn" onclick="document.getElementById('pocketLockOverlay').style.display='flex'"><span class="material-icons-round">screen_lock_portrait</span></button>
         <button class="btn" onclick="openHistory()"><span class="material-icons-round">analytics</span></button>
@@ -142,16 +130,13 @@
 
 <script>
 let sessionDistance = 0, totalSeconds = 0, sessionSplits = [], lastCoords = null, watchID, timerInterval;
-let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer;
-let lastSpokenMilestone = 0;
-
+let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer, lastSpokenMilestone = 0;
 let totalAccumulated = parseFloat(localStorage.getItem('chan_total')) || 0;
 let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 let targetDate = localStorage.getItem('chan_target_date') || "";
 
-// Database Setup - Version 19
-const dbReq = indexedDB.open("ChanthiranDB", 19);
+const dbReq = indexedDB.open("ChanthiranDB", 20);
 dbReq.onupgradeneeded = (e) => {
     let db = e.target.result;
     if(db.objectStoreNames.contains("runs")) db.deleteObjectStore("runs");
@@ -225,15 +210,15 @@ function toggleStart() {
 function startTracking() {
     timerInterval = setInterval(() => { totalSeconds++; updateUI(); }, 1000);
     watchID = navigator.geolocation.watchPosition(pos => {
+        if (!isRunning) return; // HARD STOP CHECK
         const { latitude: lat, longitude: lng, accuracy } = pos.coords;
         document.getElementById('accDisplay').innerText = Math.round(accuracy) + "m";
         document.getElementById('gpsIcon').classList.toggle('sig-good', accuracy < 20);
         currentMarker.setLatLng([lat, lng]);
 
-        // Drift protection: only count if move > 10m and accuracy < 20m
-        if(accuracy < 20 && lastCoords) {
+        if(accuracy < 25 && lastCoords) {
             const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
-            if(d > 0.01) { 
+            if(d > 0.008) { 
                 sessionDistance += d;
                 routeLine.addLatLng([lat, lng]);
                 let currentKm = Math.floor(sessionDistance);
@@ -248,7 +233,12 @@ function startTracking() {
 
 function stopAndSave() {
     if(!confirm("Finish and save?")) return;
-    isRunning = false; clearTimeout(idleTimer);
+    isRunning = false; // IMMEDIATE FLAG STOP
+    clearInterval(timerInterval);
+    navigator.geolocation.clearWatch(watchID);
+    lastCoords = null; // WIPE CACHE
+    clearTimeout(idleTimer);
+
     const finalDist = sessionDistance.toFixed(2);
     const runData = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
     
@@ -294,24 +284,20 @@ async function generateAndProcessPdf(mode) {
             headStyles: { fillColor: [10, 132, 255] }
         });
         
+        // --- PURE CURSIVE SIGNATURE ---
         const pageHeight = doc.internal.pageSize.height;
-        doc.setFont("times", "italic");
-        doc.setFontSize(18);
+        doc.setFont("courier", "oblique"); // Pure cursive style
+        doc.setFontSize(20);
         doc.setTextColor(10, 132, 255);
-        doc.text("Chanthiran", 14, pageHeight - 25);
+        doc.text("Chanthiran Sivaperuman", 14, pageHeight - 22);
         
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.setTextColor(0);
         doc.text("__________________________", 14, pageHeight - 20);
-        doc.setFont("helvetica", "bold");
-        doc.text("Chanthiran Sivaperuman", 14, pageHeight - 12);
         
         const fileName = `${event.replace(/\s+/g, '_')}.pdf`;
-        
-        if(mode === 'save') {
-            doc.save(fileName);
-        } else {
+        if(mode === 'save') { doc.save(fileName); } else {
             const pdfBlob = doc.output('blob');
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -339,12 +325,7 @@ function openHistory() {
 
 function toggleMap() { mapState = !mapState; document.getElementById('map').style.display = mapState ? 'block' : 'none'; if(mapState) map.invalidateSize(); }
 function updateLoc() { localStorage.setItem('chan_loc', document.getElementById('locInput').value); location.reload(); }
-function updateGoal() { 
-    localStorage.setItem('chan_target', document.getElementById('goalInput').value); 
-    localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); 
-    location.reload(); 
-}
-
+function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); }
 function updateProgress() { 
     if(targetGoal > 0) { 
         document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; 
@@ -356,9 +337,7 @@ function updateProgress() {
         document.getElementById('daysDisplay').innerText = `${Math.max(days, 0)} DAYS LEFT`;
     }
 }
-
 function calcDist(l1, o1, l2, o2) { const R = 6371; const dL = (l2-l1)*Math.PI/180; const dO = (o2-o1)*Math.PI/180; const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
-
 function updateUI() {
     document.getElementById('distance').innerText = sessionDistance.toFixed(2);
     const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
