@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
-        :root { --neon-green: #32D74B; --accent-blue: #0A84FF; --danger-red: #FF453A; --card-bg: #1c1c1e; }
+        :root { --neon-green: #32D74B; --accent-blue: #0A84FF; --danger-red: #FF453A; --card-bg: #1c1c1e; --warning-yellow: #FFCC00; }
         body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
@@ -56,7 +56,7 @@
     </div>
     <div style="text-align: center;">
         <div class="app-title">Chanthiran</div>
-        <div style="font-size: 0.55rem; letter-spacing: 2px; opacity: 0.7;">RUN TRACKER PRO</div>
+        <div id="targetDateDisplay" style="font-size: 0.55rem; letter-spacing: 1px; color: var(--warning-yellow);">DUE: NOT SET</div>
     </div>
     <button onclick="toggleMap()" class="btn" style="width:40px; height:40px;"><span class="material-icons-round">map</span></button>
 </div>
@@ -78,7 +78,7 @@
 <div class="controls-bar">
     <div style="width:100%; display:flex; justify-content: space-between; font-size: 0.75rem; font-weight: 800;">
         <span><span class="material-icons-round" style="font-size:14px; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
-        <span>GOAL: <b id="goalVal">0.00</b></span>
+        <span>BAL: <b id="balKm">0.00</b></span>
     </div>
     <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
     
@@ -103,8 +103,9 @@
     <div class="modal-content">
         <div style="padding:25px; display:flex; justify-content:space-between; align-items:center; position: sticky; top:0; background:#1c1c1e; z-index:100;">
             <h2 style="margin:0; color:var(--neon-green);">HISTORY</h2>
-            <div style="display:flex; gap:20px;">
-                <span class="material-icons-round" onclick="sharePdf()" style="color:var(--danger-red); cursor:pointer; font-size:30px;">picture_as_pdf</span>
+            <div style="display:flex; gap:18px;">
+                <span class="material-icons-round" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
+                <span class="material-icons-round" onclick="generateAndProcessPdf('share')" style="color:var(--warning-yellow); cursor:pointer; font-size:30px;">share</span>
                 <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'" style="font-size:30px; cursor:pointer;">close</span>
             </div>
         </div>
@@ -122,9 +123,11 @@
 
 <div id="goalModal" class="standard-modal">
     <div class="modal-card">
-        <h3>SET TARGET KM</h3>
-        <input type="number" id="goalInput" placeholder="KM">
-        <button onclick="updateGoal()">SAVE</button>
+        <h3>SET TARGET</h3>
+        <input type="number" id="goalInput" placeholder="Target KM">
+        <input type="date" id="dateInput">
+        <button onclick="updateGoal()">SAVE GOAL</button>
+        <button onclick="document.getElementById('goalModal').style.display='none'" style="background:transparent; color:#888;">CANCEL</button>
     </div>
 </div>
 
@@ -132,11 +135,13 @@
 let sessionDistance = 0, totalSeconds = 0, sessionSplits = [], lastCoords = null, watchID, timerInterval;
 let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer;
 let lastSpokenMilestone = 0;
+
 let totalAccumulated = parseFloat(localStorage.getItem('chan_total')) || 0;
 let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
+let targetDate = localStorage.getItem('chan_target_date') || "";
 
-const dbReq = indexedDB.open("ChanthiranDB", 13);
+const dbReq = indexedDB.open("ChanthiranDB", 15);
 dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
 dbReq.onsuccess = (e) => { db = e.target.result; };
 
@@ -144,7 +149,7 @@ window.onload = () => {
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
     document.getElementById('locDisplay').innerText = routeName;
     document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
-    document.getElementById('goalVal').innerText = targetGoal.toFixed(2);
+    if (targetDate) document.getElementById('targetDateDisplay').innerText = `DUE: ${new Date(targetDate).toLocaleDateString('en-GB')}`;
     updateProgress();
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     initMap();
@@ -160,61 +165,28 @@ function initMap() {
 function speak(text) {
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(text);
-    msg.rate = 0.9; // Slightly slower for clarity
+    msg.rate = 0.9;
     window.speechSynthesis.speak(msg);
 }
 
 function resetIdleTimer() {
     clearTimeout(idleTimer);
-    if(isRunning) {
-        idleTimer = setTimeout(() => {
-            document.getElementById('pocketLockOverlay').style.display = 'flex';
-        }, 30000);
-    }
+    if(isRunning) idleTimer = setTimeout(() => { document.getElementById('pocketLockOverlay').style.display = 'flex'; }, 30000);
 }
 
-function unlockPocket() {
-    document.getElementById('pocketLockOverlay').style.display = 'none';
-    resetIdleTimer();
-}
+function unlockPocket() { document.getElementById('pocketLockOverlay').style.display = 'none'; resetIdleTimer(); }
 
 function checkMilestones() {
-    // Current milestone in 0.5 increments
     let currentMilestone = Math.floor(sessionDistance * 2) / 2;
-
     if (currentMilestone > lastSpokenMilestone) {
         lastSpokenMilestone = currentMilestone;
-
-        // Custom alerts for 5km and 10km
-        if (currentMilestone === 5) {
-            speak("5 kilometers. Just run.");
-            return;
-        }
-        if (currentMilestone === 10) {
-            speak("10 kilometers. Keep moving.");
-            return;
-        }
-        
-        if (currentMilestone === 10) {
-            speak("15 kilometers. yuou can do it.");
-            return;
-        }
-        
-        if (currentMilestone === 10) {
-            speak("20 kilometers. DOn't Give Up.");
-            return;
-        }
-
-        // Full KM update (1, 2, 3...)
+        if (currentMilestone === 5) { speak("5 kilometers. Just run."); return; }
+        if (currentMilestone === 10) { speak("10 kilometers. Keep moving."); return; }
         if (currentMilestone % 1 === 0) {
             let t = document.getElementById('timer').innerText.split(':');
             let p = document.getElementById('pace').innerText.replace('"', '').split("'");
             speak(`${currentMilestone} kilometers. Time: ${parseInt(t[0])} minutes ${t[1]} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
-        } 
-        // Half KM update (0.5, 1.5, 2.5...)
-        else {
-            speak(`${currentMilestone} kilometers.`);
-        }
+        } else { speak(`${currentMilestone} kilometers.`); }
     }
 }
 
@@ -244,19 +216,13 @@ function startTracking() {
         document.getElementById('accDisplay').innerText = Math.round(accuracy) + "m";
         document.getElementById('gpsIcon').classList.toggle('sig-good', accuracy < 20);
         currentMarker.setLatLng([lat, lng]);
-
         if(accuracy < 30 && lastCoords) {
             const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
             if(d > 0.005) { 
                 sessionDistance += d;
                 routeLine.addLatLng([lat, lng]);
-                
-                // Track splits for history
                 let currentKm = Math.floor(sessionDistance);
-                if(currentKm > sessionSplits.length) {
-                    sessionSplits.push({ km: currentKm, time: document.getElementById('timer').innerText });
-                }
-                
+                if(currentKm > sessionSplits.length) sessionSplits.push({ km: currentKm, time: document.getElementById('timer').innerText });
                 checkMilestones();
                 updateUI();
             }
@@ -267,11 +233,9 @@ function startTracking() {
 
 function stopAndSave() {
     if(!confirm("Finish and save?")) return;
-    isRunning = false;
-    clearTimeout(idleTimer);
+    isRunning = false; clearTimeout(idleTimer);
     const finalDist = sessionDistance.toFixed(2);
     const data = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
-    
     db.transaction("runs", "readwrite").objectStore("runs").add(data).onsuccess = () => {
         totalAccumulated += sessionDistance;
         localStorage.setItem('chan_total', totalAccumulated);
@@ -280,16 +244,7 @@ function stopAndSave() {
     };
 }
 
-function resetAll() {
-    if(confirm("Start a New Season? Clears everything!")) {
-        speak("It's a new run. Run for health!");
-        localStorage.clear(); 
-        indexedDB.deleteDatabase("ChanthiranDB");
-        setTimeout(() => location.reload(), 3000);
-    }
-}
-
-async function sharePdf() {
+async function generateAndProcessPdf(mode) {
     const event = prompt("Event Name:", "Official Run Report") || "Run Report";
     const tx = db.transaction("runs", "readonly");
     const runs = await new Promise(r => tx.objectStore("runs").getAll().onsuccess = e => r(e.target.result));
@@ -301,14 +256,20 @@ async function sharePdf() {
     doc.text("__________________________", 14, 275);
     doc.text("Chanthiran Sivaperuman", 14, 282);
     
-    const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
-    const file = new File([blob], "Report.pdf", { type: 'application/pdf' });
-    if(navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Run Report' });
-    } else { doc.save("Report.pdf"); }
+    const fileName = `${event.replace(/\s+/g, '_')}_Report.pdf`;
+    if(mode === 'save') {
+        doc.save(fileName);
+    } else {
+        const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+        if(navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Run Report' });
+        } else { doc.save(fileName); }
+    }
 }
 
 function deleteRun(id) { if(confirm("Delete run?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => openHistory(); }
+function resetAll() { if(confirm("Start a New Season? Clears everything!")) { speak("It's a new run. Run for health!"); localStorage.clear(); indexedDB.deleteDatabase("ChanthiranDB"); setTimeout(() => location.reload(), 3000); } }
 
 function openHistory() {
     document.getElementById('historyModal').style.display = 'flex';
@@ -322,14 +283,11 @@ function openHistory() {
         });
     };
 }
-function toggleMap() { 
-    mapState = !mapState; 
-    document.getElementById('map').style.display = mapState ? 'block' : 'none'; 
-    if(mapState) map.invalidateSize();
-}
+
+function toggleMap() { mapState = !mapState; document.getElementById('map').style.display = mapState ? 'block' : 'none'; if(mapState) map.invalidateSize(); }
 function updateLoc() { localStorage.setItem('chan_loc', document.getElementById('locInput').value); location.reload(); }
-function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); location.reload(); }
-function updateProgress() { if(targetGoal > 0) document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; }
+function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); }
+function updateProgress() { if(targetGoal > 0) { document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; document.getElementById('balKm').innerText = Math.max(targetGoal - totalAccumulated, 0).toFixed(2); } }
 function calcDist(l1, o1, l2, o2) { const R = 6371; const dL = (l2-l1)*Math.PI/180; const dO = (o2-o1)*Math.PI/180; const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
 
 function updateUI() {
