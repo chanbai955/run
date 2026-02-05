@@ -36,7 +36,6 @@
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
         .running-pulse { animation: pulse 1.5s infinite ease-in-out; }
 
-        /* MAIN DISPLAY */
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         
@@ -52,7 +51,7 @@
         #gpsIcon { font-size: 24px; transition: all 0.3s ease; color: #333; }
         .sig-good { color: var(--accent-blue) !important; }
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 30px; text-align: center; z-index: 10; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 20px; text-align: center; z-index: 10; }
         .stat-box h2 { margin: 0; font-size: 2rem; }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
@@ -62,7 +61,10 @@
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; margin-top: 8px; }
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; }
 
-        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 10px; }
+        .loc-row { width: 90%; display: flex; align-items: center; gap: 10px; margin-top: 10px; cursor: pointer; color: var(--accent-blue); }
+        .loc-row b { text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+
+        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 15px; }
         .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border: 2px solid #555; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; text-align: center; }
         
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
@@ -82,12 +84,13 @@
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         .history-list-container { padding: 10px 25px 120px 25px; }
-        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent-blue); }
+        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; border-left: 4px solid var(--accent-blue); position: relative; }
+        .history-item span.del { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--danger-red); cursor: pointer; }
 
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
-        .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        .satellite-view .leaflet-tile-container { filter: none !important; }
+        .modal-card input { width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; font-weight: bold; }
+        .modal-card button { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; border: none; }
     </style>
 </head>
 <body>
@@ -135,6 +138,11 @@
             <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
         </div>
 
+        <div class="loc-row" id="editLoc">
+            <span class="material-icons-round">place</span>
+            <b id="locDisplay">SET ROUTE</b>
+        </div>
+
         <div class="button-row">
             <button class="btn btn-side" id="pocketLockBtn"><span class="material-icons-round">screen_lock_portrait</span></button>
             <button class="btn btn-side" id="openHistory"><span class="material-icons-round">analytics</span></button>
@@ -162,12 +170,20 @@
         </div>
     </div>
 
+    <div id="locModal" class="standard-modal">
+        <div class="modal-card">
+            <h2>ROUTE NAME</h2>
+            <input type="text" id="locInput" placeholder="Enter Location">
+            <button id="saveLoc">SAVE ROUTE</button>
+        </div>
+    </div>
+
     <div id="goalModal" class="standard-modal">
         <div class="modal-card">
-            <h2>SET TARGET</h2>
-            <input type="number" id="goalInput" placeholder="KM" style="width:90%; padding:12px; margin-bottom:10px; border-radius:10px; border:none;">
-            <input type="date" id="dateInput" style="width:90%; padding:12px; margin-bottom:15px; border-radius:10px; border:none;">
-            <button id="saveGoal" style="width:100%; padding:15px; background:var(--neon-green); border-radius:15px; font-weight:800; border:none;">SET</button>
+            <h2>TARGET GOAL</h2>
+            <input type="number" id="goalInput" placeholder="KM Target">
+            <input type="date" id="dateInput">
+            <button id="saveGoal">SET TARGET</button>
         </div>
     </div>
 
@@ -175,6 +191,8 @@
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
+    let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
+    
     let sessionDistance = 0, totalSeconds = 0, runPath = [], lastSpokenDistance = 0, lastPointTime = Date.now();
     let watchID, timerInterval, lastCoords = null, db, map, routeLine, currentMarker, streetTiles, satelliteTiles, mapState = 2;
     let wakeLock = null, isMoving = false, stopStartTime = null;
@@ -191,6 +209,7 @@
         updateDisplay();
         initBattery();
         document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
+        document.getElementById('locDisplay').innerText = runLocation;
         setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     };
 
@@ -236,12 +255,18 @@
             speak("Paused");
             return;
         }
+        
+        // Corrected start/resume speech logic
+        if (totalSeconds === 0) { speak("Enjoy the run"); } 
+        else { speak("Run resumed"); }
+        
         startTracking();
-        speak(totalSeconds === 0 ? "Enjoy Your RUN" : "Run resumed");
     };
 
     function startTracking() {
-        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(lock => wakeLock = lock);
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').then(lock => { wakeLock = lock; }).catch(e => console.error(e));
+        }
         document.getElementById('startIcon').innerText = "pause";
         document.getElementById('stopBtn').classList.remove('hidden');
         document.getElementById('headerRunIcon').classList.add('running-pulse');
@@ -253,9 +278,10 @@
             currentMarker.setLatLng([lat, lng]);
             if (mapState !== 2) map.panTo([lat, lng]);
             
-            const icon = document.getElementById('gpsIcon');
-            if (accuracy < 15) icon.classList.add('sig-good'); else icon.classList.remove('sig-good');
+            if (accuracy < 15) document.getElementById('gpsIcon').classList.add('sig-good');
+            else document.getElementById('gpsIcon').classList.remove('sig-good');
 
+            // Hard Filter to stop drift inside a room
             if (accuracy > 12) return; 
 
             if (lastCoords) {
@@ -263,6 +289,7 @@
                 const timeDiff = (Date.now() - lastPointTime) / 1000;
                 const calcSpeed = (d / (timeDiff / 3600));
 
+                // Movement logic: Ignore drift < 7m or < 2.8 km/h
                 if (d > 0.007 && calcSpeed > 2.8) {
                     isMoving = true; stopStartTime = null;
                     sessionDistance += d;
@@ -273,20 +300,28 @@
                     document.getElementById('headerRunIcon').style.opacity = "1";
                 } else {
                     if (!stopStartTime) stopStartTime = Date.now();
+                    // Auto-pause if idle for 3 seconds
                     if (Date.now() - stopStartTime > 3000) { isMoving = false; document.getElementById('headerRunIcon').style.opacity = "0.3"; }
                 }
             }
             lastCoords = {lat, lng};
-        }, null, {enableHighAccuracy: true});
+        }, e => console.error(e), {enableHighAccuracy: true, maximumAge: 0});
     }
 
     document.getElementById('stopBtn').onclick = () => {
         if(!confirm("Finish and Save?")) return;
         stopTracking();
         const tx = db.transaction("runs", "readwrite");
-        tx.objectStore("runs").add({ date: document.getElementById('fullDate').innerText, distance: sessionDistance.toFixed(2), duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText });
+        tx.objectStore("runs").add({ 
+            date: document.getElementById('fullDate').innerText, 
+            distance: sessionDistance.toFixed(2), 
+            duration: document.getElementById('timer').innerText, 
+            pace: document.getElementById('pace').innerText,
+            location: runLocation 
+        });
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
+        
         speak(`Run Completed And Saved. ${sessionDistance.toFixed(2)} kilometers. Well Done Chanthiran`);
         setTimeout(() => location.reload(), 4500);
     };
@@ -294,7 +329,7 @@
     function stopTracking() {
         clearInterval(timerInterval);
         if(watchID) navigator.geolocation.clearWatch(watchID);
-        if(wakeLock) wakeLock.release();
+        if(wakeLock) { wakeLock.release(); wakeLock = null; }
         document.getElementById('startIcon').innerText = "play_arrow";
         document.getElementById('headerRunIcon').classList.remove('running-pulse');
         isMoving = false;
@@ -305,7 +340,7 @@
         const mapEl = document.getElementById('map');
         this.querySelector('.material-icons-round').style.transform = `rotate(${360 * (mapState + 1)}deg)`;
         if (mapState === 0) { mapEl.style.display = 'block'; map.removeLayer(satelliteTiles); streetTiles.addTo(map); }
-        else if (mapState === 1) { mapEl.style.display = 'block'; mapEl.classList.add('satellite-view'); map.removeLayer(streetTiles); satelliteTiles.addTo(map); }
+        else if (mapState === 1) { mapEl.style.display = 'block'; map.removeLayer(streetTiles); satelliteTiles.addTo(map); }
         else { mapEl.style.display = 'none'; }
         if (mapState !== 2) setTimeout(() => { map.invalidateSize(); if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); }, 300);
     };
@@ -315,19 +350,29 @@
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
-            const list = document.getElementById('lapList');
-            list.innerHTML = "";
+            const list = document.getElementById('lapList'); list.innerHTML = "";
             req.result.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
-                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}</div><span class="material-icons-round" onclick="deleteRun(${run.id})" style="color:var(--danger-red);">delete</span>`;
+                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location || 'NOT SET'}</small></div>
+                <span class="material-icons-round del" onclick="deleteRun(${run.id})">delete</span>`;
                 list.appendChild(row);
             });
         };
     };
 
-    window.deleteRun = (id) => { if(confirm("Delete?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => document.getElementById('openHistory').onclick(); };
+    window.deleteRun = (id) => { if(confirm("Delete this run permanently?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => document.getElementById('openHistory').onclick(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start New?")) { speak("New Run,I don’t run to add days to my life, I run to add life to my days"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
+    
+    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
+    document.getElementById('saveLoc').onclick = () => {
+        const val = document.getElementById('locInput').value || "NOT SET";
+        runLocation = val;
+        localStorage.setItem('chan_run_loc', val);
+        document.getElementById('locDisplay').innerText = val;
+        document.getElementById('locModal').style.display = 'none';
+    };
+
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Clear all lifetime data and goals?")) { speak("I don’t run to add days to my life, I run to add life to my days"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
     document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
     document.getElementById('pocketLockOverlay').ondblclick = () => document.getElementById('pocketLockOverlay').style.display = 'none';
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
