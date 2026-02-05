@@ -372,7 +372,7 @@
         document.getElementById('locModal').style.display = 'none';
     };
 
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Clear all lifetime data and goals?")) { speak("I don’t run to add days to my life, I run to add life to my days"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Clear all lifetime data and goals?")) { speak("Its a New Run..lets Run for Health"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
     document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
     document.getElementById('pocketLockOverlay').ondblclick = () => document.getElementById('pocketLockOverlay').style.display = 'none';
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
