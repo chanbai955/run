@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Run Tracker Elite</title>
+    <title>Chanthiran Run Tracker Pro</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,7 +24,6 @@
             display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
 
-        /* HEADER */
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
@@ -35,24 +34,18 @@
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
 
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
         .running-pulse { animation: pulse 1.5s infinite ease-in-out; }
 
-        /* MAIN DISPLAY */
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         
         .main-stat { 
-            font-size: clamp(6.5rem, 25vw, 8.5rem); 
-            font-weight: 900; margin: 0; 
+            font-size: clamp(6.5rem, 25vw, 8.5rem); font-weight: 900; margin: 0; 
             background: linear-gradient(180deg, #444 30%, var(--neon-green)); 
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
             line-height: 0.8; z-index: 10; pointer-events: none;
-            filter: drop-shadow(0 0 15px rgba(50, 215, 75, 0.6));
+            filter: drop-shadow(0 0 15px rgba(50, 215, 75, 0.4));
         }
 
         .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; z-index: 10; }
@@ -64,7 +57,6 @@
         .stat-box h2 { margin: 0; font-size: 2rem; }
         .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
 
-        /* CONTROLS */
         .controls-bar { background: #121212; padding: 20px 20px 120px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; z-index: 100; }
         .goal-container { width: 90%; margin-bottom: 5px; }
         .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; margin-top: 8px; }
@@ -72,7 +64,6 @@
 
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 10px; }
         .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border: 2px solid #555; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; text-align: center; }
-        .new-run-circle span { color: white; font-weight: 900; line-height: 1; pointer-events: none; }
         
         .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
         .btn-main { width: 85px; height: 85px; }
@@ -81,14 +72,12 @@
         .stop { background: var(--danger-red); color: #fff; }
         .hidden { display: none !important; }
 
-        /* POCKET LOCK OVERLAY */
         #pocketLockOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: #000; z-index: 9999; display: none; 
             flex-direction: column; justify-content: center; align-items: center;
         }
 
-        /* MODALS */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
         .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
         .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
@@ -165,8 +154,8 @@
             <button class="btn btn-side" id="pocketLockBtn" style="color:var(--accent-blue);"><span class="material-icons-round">screen_lock_portrait</span></button>
             <button class="btn btn-side" id="openHistory" style="color:var(--accent-blue);"><span class="material-icons-round">analytics</span></button>
             <div class="new-run-circle" id="newRunBtn">
-                <span style="font-size: 0.6rem; margin-bottom: 2px;">NEW</span>
-                <span style="font-size: 0.75rem;">RUN</span>
+                <span style="font-size: 0.6rem; margin-bottom: 2px; color:#fff; font-weight:900;">NEW</span>
+                <span style="font-size: 0.75rem; color:#fff; font-weight:900;">RUN</span>
             </div>
             <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
@@ -221,7 +210,6 @@
     let map, routeLine, currentMarker, streetTiles, satelliteTiles;
     let mapState = 2; 
 
-    // Wake Lock & Auto-Pause Logic
     let wakeLock = null;
     let isMoving = false;
     let stopStartTime = null;
@@ -355,7 +343,8 @@
             map.panTo([lat, lng]);
             updateGpsIcon(accuracy);
 
-            if (accuracy > 25) return; 
+            // DRIFT FILTER 1: Reject signals with > 12m accuracy (prevents room drift)
+            if (accuracy > 12) return; 
 
             if (lastCoords) {
                 const R = 6371;
@@ -365,11 +354,12 @@
                 const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 
                 const timeDiff = (Date.now() - lastPointTime) / 1000;
-                const calcSpeed = (d * 1000) / timeDiff;
+                const calcSpeedKmH = (d / (timeDiff / 3600));
 
-                // Only move if speed > 0.6 m/s (approx 2.1 km/h)
-                if (d > 0.004 && (speed > 0.6 || calcSpeed > 0.6)) {
-                    isMoving = true; stopStartTime = null;
+                // DRIFT FILTER 2: Movement must be > 7 meters AND > 2.8 km/h
+                if (d > 0.007 && calcSpeedKmH > 2.8) {
+                    isMoving = true; 
+                    stopStartTime = null;
                     sessionDistance += d;
                     runPath.push([lat, lng]); routeLine.addLatLng([lat, lng]);
                     localStorage.setItem('chan_session_dist', sessionDistance);
@@ -379,53 +369,61 @@
                     document.getElementById('headerRunIcon').style.opacity = "1";
                 } else {
                     if (!stopStartTime) stopStartTime = Date.now();
-                    if (Date.now() - stopStartTime > 5000) { 
+                    // AUTO-PAUSE after 3 seconds of stillness
+                    if (Date.now() - stopStartTime > 3000) { 
                         isMoving = false; 
                         document.getElementById('headerRunIcon').style.opacity = "0.3";
                     }
                 }
             }
             lastCoords = {lat, lng};
-        }, null, {enableHighAccuracy: true});
+        }, null, {enableHighAccuracy: true, maximumAge: 0});
     };
 
     function updateGpsIcon(accuracy) {
         const icon = document.getElementById('gpsIcon');
         const accDisplay = document.getElementById('accDisplay');
-        if (accuracy < 25) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
+        if (accuracy < 15) { icon.classList.add('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (LOCKED)`; accDisplay.style.color = "var(--accent-blue)"; }
         else { icon.classList.remove('sig-good'); accDisplay.innerText = `ACCURACY: ${accuracy.toFixed(0)}M (SEARCHING)`; accDisplay.style.color = "var(--warning-yellow)"; }
     }
 
-    document.getElementById('stopBtn').onclick = async () => {
-        if(!confirm("Finish and Save?")) return;
-        clearInterval(timerInterval);
-        if(watchID) navigator.geolocation.clearWatch(watchID);
-        releaseWakeLock();
-        
-        const tx = db.transaction("runs", "readwrite");
-        tx.objectStore("runs").add({ 
-            date: document.getElementById('fullDate').innerText, 
-            distance: sessionDistance.toFixed(2), 
-            duration: document.getElementById('timer').innerText, 
-            pace: document.getElementById('pace').innerText,
-            location: runLocation, route: runPath 
-        });
-        totalDistance += sessionDistance;
-        localStorage.setItem('chan_accumulated_km', totalDistance);
-        
-        localStorage.removeItem('chan_session_dist');
-        localStorage.removeItem('chan_session_seconds');
-        localStorage.removeItem('chan_session_path');
-        
-        speak("Run Completed And Saved. Bravo Chanthiran");
-        setTimeout(() => location.reload(), 2000);
-    };
+  document.getElementById('stopBtn').onclick = async () => {
+    if(!confirm("Finish and Save?")) return;
+    clearInterval(timerInterval);
+    if(watchID) navigator.geolocation.clearWatch(watchID);
+    releaseWakeLock();
+    
+    // Save to IndexedDB
+    const tx = db.transaction("runs", "readwrite");
+    tx.objectStore("runs").add({ 
+        date: document.getElementById('fullDate').innerText, 
+        distance: sessionDistance.toFixed(2), 
+        duration: document.getElementById('timer').innerText, 
+        pace: document.getElementById('pace').innerText,
+        location: runLocation, 
+        route: runPath 
+    });
 
-    // Pocket Lock
+    // Update Lifetime Total
+    totalDistance += sessionDistance;
+    localStorage.setItem('chan_accumulated_km', totalDistance);
+    
+    // Clear temporary session storage
+    localStorage.removeItem('chan_session_dist');
+    localStorage.removeItem('chan_session_seconds');
+    localStorage.removeItem('chan_session_path');
+    
+    // VOICE LOGIC: Announced Distance
+    const finalDist = sessionDistance.toFixed(2);
+    speak(`Run Completed And Saved. Your final distance is ${finalDist} kilometers. Well Done Chanthiran`);
+    
+    // Reload after speech starts
+    setTimeout(() => location.reload(), 3500); // Increased delay to ensure he finishes talking
+};
+
     document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
     document.getElementById('pocketLockOverlay').ondblclick = () => document.getElementById('pocketLockOverlay').style.display = 'none';
 
-    // History & Other buttons
     document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     
