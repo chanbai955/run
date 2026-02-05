@@ -34,6 +34,9 @@
         .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
         .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
 
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        .running-pulse { animation: pulse 1.5s infinite ease-in-out; }
+
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         
@@ -70,19 +73,16 @@
         .start { background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red); color: #fff; }
 
-        /* CHART STYLES */
+        #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
+        .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
+        .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         .chart-wrapper { margin: 15px 20px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; }
         .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
         .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; position: relative; display: flex; align-items: flex-end; justify-content: center; }
         .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--accent-blue); font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; }
         .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
-
-        #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
-
-        /* MODALS */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
-        .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
-        .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         .history-list-container { padding: 10px 25px 120px 25px; }
         .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; border-left: 4px solid var(--accent-blue); position: relative; }
         .history-item span.del { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--danger-red); cursor: pointer; }
@@ -169,9 +169,7 @@
                     <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
                 </div>
             </div>
-            <div class="chart-wrapper">
-                <div class="chart-container" id="runChart"></div>
-            </div>
+            <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
             <div class="history-list-container" id="lapList"></div>
         </div>
     </div>
@@ -201,7 +199,7 @@
     
     let sessionDistance = 0, totalSeconds = 0, runPath = [], lastSpokenDistance = 0, lastPointTime = Date.now();
     let watchID, timerInterval, lastCoords = null, db, map, routeLine, currentMarker, streetTiles, satelliteTiles, mapState = 2;
-    let wakeLock = null, isMoving = false, stopStartTime = null;
+    let wakeLock = null;
 
     const dbReq = indexedDB.open("runProEliteDB", 4);
     dbReq.onupgradeneeded = (e) => {
@@ -269,10 +267,14 @@
         document.getElementById('stopBtn').classList.remove('hidden');
         document.getElementById('headerRunIcon').classList.add('running-pulse');
 
-        timerInterval = setInterval(() => { if (isMoving) { totalSeconds++; updateDisplay(); } }, 1000);
+        // TIMER NOW RUNS CONTINUOUSLY UNTIL STOPPED
+        timerInterval = setInterval(() => {
+            totalSeconds++;
+            updateDisplay();
+        }, 1000);
 
         watchID = navigator.geolocation.watchPosition(pos => {
-            const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+            const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
             currentMarker.setLatLng([lat, lng]);
             if (mapState !== 2) map.panTo([lat, lng]);
             
@@ -286,17 +288,15 @@
                 const timeDiff = (Date.now() - lastPointTime) / 1000;
                 const calcSpeed = (d / (timeDiff / 3600));
 
+                // Only record distance if we are actually walking/running
+                // But timer (totalSeconds) is no longer inside this IF block
                 if (d > 0.007 && calcSpeed > 2.8) {
-                    isMoving = true; stopStartTime = null;
                     sessionDistance += d;
                     runPath.push([lat, lng]);
                     routeLine.addLatLng([lat, lng]);
-                    updateDisplay(); checkVoiceMilestones();
+                    updateDisplay();
+                    checkVoiceMilestones();
                     lastPointTime = Date.now();
-                    document.getElementById('headerRunIcon').style.opacity = "1";
-                } else {
-                    if (!stopStartTime) stopStartTime = Date.now();
-                    if (Date.now() - stopStartTime > 3000) { isMoving = false; document.getElementById('headerRunIcon').style.opacity = "0.3"; }
                 }
             }
             lastCoords = {lat, lng};
@@ -323,13 +323,12 @@
     function stopTracking() {
         clearInterval(timerInterval);
         if(watchID) navigator.geolocation.clearWatch(watchID);
-        if(wakeLock) wakeLock.release();
+        if(wakeLock) { wakeLock.release(); wakeLock = null; }
         document.getElementById('startIcon').innerText = "play_arrow";
         document.getElementById('headerRunIcon').classList.remove('running-pulse');
-        isMoving = false;
     }
 
-    // MAP AND UI LOGIC
+    // UI & History Logic
     document.getElementById('mapLoopBtn').onclick = function() {
         mapState = (mapState + 1) % 3;
         const mapEl = document.getElementById('map');
@@ -340,7 +339,6 @@
         if (mapState !== 2) setTimeout(() => { map.invalidateSize(); if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); }, 300);
     };
 
-    // HISTORY AND CHART LOGIC
     document.getElementById('openHistory').onclick = () => {
         document.getElementById('historyModal').style.display = 'flex';
         renderHistory();
@@ -354,49 +352,36 @@
             list.innerHTML = ""; chart.innerHTML = "";
             const runs = req.result;
             const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
-
-            // RENDER CHART
             runs.forEach(run => {
                 const bar = document.createElement('div'); bar.className = 'chart-bar';
                 bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
-                bar.innerHTML = `<span class="bar-val">${run.distance} KM</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
+                bar.innerHTML = `<span class="bar-val">${run.distance}</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
                 chart.appendChild(bar);
             });
-
-            // RENDER LIST
             runs.reverse().forEach(run => {
                 const row = document.createElement('div'); row.className = "history-item";
-                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location || 'NONE'}</small></div>
-                <span class="material-icons-round del" onclick="deleteRun(${run.id})">delete</span>`;
+                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location || 'NONE'}</small></div><span class="material-icons-round del" onclick="deleteRun(${run.id})">delete</span>`;
                 list.appendChild(row);
             });
         };
     }
 
-    // PDF EXPORT
     document.getElementById('exportPdf').onclick = () => {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
         req.onsuccess = () => {
-            const runs = req.result;
-            if(runs.length === 0) return alert("No runs to export.");
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text("CHANTHIRAN RUN TRACKER REPORT", 14, 20);
-            const data = runs.reverse().map(r => [r.date, r.distance + " KM", r.duration, r.pace, r.location || 'N/A']);
-            doc.autoTable({ startY: 30, head: [['Date', 'Dist', 'Time', 'Pace', 'Route']], body: data });
-            doc.save(`Run_Report_${new Date().getTime()}.pdf`);
+            doc.text("CHANTHIRAN RUN REPORT", 14, 20);
+            doc.autoTable({ startY: 30, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: req.result.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]) });
+            doc.save(`Run_Report.pdf`);
         };
     };
 
-    // UTILS
     window.deleteRun = (id) => { if(confirm("Delete?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => renderHistory(); };
     document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
-    document.getElementById('saveLoc').onclick = () => {
-        const val = document.getElementById('locInput').value || "NOT SET";
-        localStorage.setItem('chan_run_loc', val); location.reload();
-    };
+    document.getElementById('saveLoc').onclick = () => { localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); location.reload(); };
     document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
     document.getElementById('pocketLockOverlay').ondblclick = () => document.getElementById('pocketLockOverlay').style.display = 'none';
     document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
@@ -405,7 +390,7 @@
         localStorage.setItem('chan_target_date', document.getElementById('dateInput').value);
         location.reload();
     };
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start New?")) { speak("I don’t run to add days to my life, I run to add life to my days"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start New fresh?")) { speak("Its a New Run ..Run For Health"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
 
     function calcDist(lat1, lon1, lat2, lon2) {
         const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
