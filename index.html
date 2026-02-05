@@ -15,22 +15,30 @@
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
         #liveClock { font-size: 1rem; font-weight: 800; opacity: 0.8; }
-        .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
+        .app-title { color: var(--neon-green); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0; letter-spacing: 1px;}
+        
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
         .main-stat { font-size: clamp(6rem, 20vw, 8.5rem); font-weight: 900; margin: 0; background: linear-gradient(180deg, #fff 30%, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; z-index: 10; }
+        
         .label-row { display: flex; align-items: center; gap: 10px; z-index: 10; }
         #accDisplay { font-size: 0.7rem; color: #444; font-weight: 900; }
         .sig-good { color: var(--accent-blue) !important; }
+        
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; text-align: center; z-index: 10; margin-top: 15px; }
         .controls-bar { background: #121212; padding: 20px 20px 100px 20px; border-radius: 40px 40px 0 0; border-top: 1px solid #222; z-index: 100; }
-        .progress-bg { width: 90%; height: 8px; background: #222; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+        
+        .progress-container { width: 90%; margin: 10px 0; }
+        .progress-bg { width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s; }
+        .bal-row { display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size: 0.75rem; font-weight: 800; color: var(--warning-yellow); }
+
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 20px; }
         .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #2c2c2e; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .btn-main { width: 80px; height: 80px; background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red) !important; color: #fff; }
         .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; }
+        
         #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: flex-end; }
         .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; padding-bottom: 50px; }
@@ -54,11 +62,10 @@
         <span id="fullDate">--/--/----</span>
         <span id="liveClock">00:00:00</span>
     </div>
-    <div style="text-align: center;">
+    <div style="text-align: right;">
         <div class="app-title">Chanthiran</div>
-        <div id="targetDateDisplay" style="font-size: 0.55rem; letter-spacing: 1px; color: var(--warning-yellow);">DUE: NOT SET</div>
+        <div style="font-size: 0.6rem; letter-spacing: 2px; color: var(--neon-green);">RUN TRACKER</div>
     </div>
-    <button onclick="toggleMap()" class="btn" style="width:40px; height:40px;"><span class="material-icons-round">map</span></button>
 </div>
 
 <div class="main-display">
@@ -76,15 +83,17 @@
 </div>
 
 <div class="controls-bar">
-    <div style="width:100%; display:flex; justify-content: space-between; font-size: 0.75rem; font-weight: 800;">
-        <span><span class="material-icons-round" style="font-size:14px; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
-        <span>BAL: <b id="balKm">0.00</b></span>
+    <div style="width:90%; display:flex; justify-content: space-between; font-size: 0.8rem; font-weight: 900;">
+        <span><span class="material-icons-round" style="font-size:16px; vertical-align:middle; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
+        <span id="locDisplay" onclick="document.getElementById('locModal').style.display='flex'" style="color:var(--accent-blue); cursor:pointer;">SET ROUTE</span>
     </div>
-    <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
     
-    <div style="display:flex; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:8px; cursor:pointer;" onclick="document.getElementById('locModal').style.display='flex'">
-        <span class="material-icons-round" style="font-size:18px;">edit</span>
-        <b id="locDisplay" style="margin-left:5px;">SET ROUTE</b>
+    <div class="progress-container">
+        <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
+        <div class="bal-row">
+            <span>BAL DIST: <b id="balKm">0.00</b> KM</span>
+            <span>BAL DAYS: <b id="balDays">0</b> DAYS</span>
+        </div>
     </div>
 
     <div class="button-row">
@@ -96,6 +105,7 @@
         </div>
         <button id="startBtn" class="btn btn-main" onclick="toggleStart()"><span class="material-icons-round" id="startIcon" style="font-size:3rem;">play_arrow</span></button>
         <button id="stopBtn" class="btn btn-main stop hidden" onclick="stopAndSave()"><span class="material-icons-round" style="font-size:3rem;">stop</span></button>
+        <button onclick="toggleMap()" class="btn"><span class="material-icons-round">map</span></button>
     </div>
 </div>
 
@@ -104,7 +114,7 @@
         <div style="padding:25px; display:flex; justify-content:space-between; align-items:center; position: sticky; top:0; background:#1c1c1e; z-index:100;">
             <h2 style="margin:0; color:var(--neon-green);">HISTORY</h2>
             <div style="display:flex; gap:18px;">
-                <span class="material-icons-round" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
+                <span class="material-icons-round" id="pdfSaveIcon" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
                 <span class="material-icons-round" onclick="generateAndProcessPdf('share')" style="color:var(--warning-yellow); cursor:pointer; font-size:30px;">share</span>
                 <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'" style="font-size:30px; cursor:pointer;">close</span>
             </div>
@@ -117,17 +127,17 @@
     <div class="modal-card">
         <h3>ROUTE NAME</h3>
         <input type="text" id="locInput" placeholder="Enter name">
-        <button onclick="updateLoc()">SAVE</button>
+        <button onclick="updateLoc()" style="background:var(--accent-blue); color:white; border:none; padding:10px; border-radius:10px; width:100%;">SAVE</button>
     </div>
 </div>
 
 <div id="goalModal" class="standard-modal">
     <div class="modal-card">
-        <h3>SET TARGET</h3>
+        <h3>SET GOAL</h3>
         <input type="number" id="goalInput" placeholder="Target KM">
         <input type="date" id="dateInput">
-        <button onclick="updateGoal()">SAVE GOAL</button>
-        <button onclick="document.getElementById('goalModal').style.display='none'" style="background:transparent; color:#888;">CANCEL</button>
+        <button onclick="updateGoal()" style="background:var(--neon-green); color:black; border:none; padding:10px; border-radius:10px; width:100%;">SAVE GOAL</button>
+        <button onclick="document.getElementById('goalModal').style.display='none'" style="background:transparent; color:#888; border:none; margin-top:10px;">CANCEL</button>
     </div>
 </div>
 
@@ -141,7 +151,7 @@ let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 let targetDate = localStorage.getItem('chan_target_date') || "";
 
-const dbReq = indexedDB.open("ChanthiranDB", 15);
+const dbReq = indexedDB.open("ChanthiranDB", 16);
 dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
 dbReq.onsuccess = (e) => { db = e.target.result; };
 
@@ -149,7 +159,6 @@ window.onload = () => {
     document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
     document.getElementById('locDisplay').innerText = routeName;
     document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
-    if (targetDate) document.getElementById('targetDateDisplay').innerText = `DUE: ${new Date(targetDate).toLocaleDateString('en-GB')}`;
     updateProgress();
     setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
     initMap();
@@ -165,7 +174,7 @@ function initMap() {
 function speak(text) {
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(text);
-    msg.rate = 0.9;
+    msg.rate = 0.95;
     window.speechSynthesis.speak(msg);
 }
 
@@ -245,26 +254,51 @@ function stopAndSave() {
 }
 
 async function generateAndProcessPdf(mode) {
-    const event = prompt("Event Name:", "Official Run Report") || "Run Report";
-    const tx = db.transaction("runs", "readonly");
-    const runs = await new Promise(r => tx.objectStore("runs").getAll().onsuccess = e => r(e.target.result));
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
-    doc.setFontSize(14); doc.setTextColor(0); doc.text(`OFFICIAL: ${event.toUpperCase()}`, 14, 30);
-    doc.autoTable({ startY: 40, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]) });
-    doc.text("__________________________", 14, 275);
-    doc.text("Chanthiran Sivaperuman", 14, 282);
+    const btn = document.getElementById('pdfSaveIcon');
+    btn.style.opacity = "0.5"; // Visual feedback
     
-    const fileName = `${event.replace(/\s+/g, '_')}_Report.pdf`;
-    if(mode === 'save') {
-        doc.save(fileName);
-    } else {
-        const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
-        const file = new File([blob], fileName, { type: 'application/pdf' });
-        if(navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'Run Report' });
-        } else { doc.save(fileName); }
+    try {
+        const event = prompt("Report Title:", "Chanthiran_Run_Report") || "Report";
+        const tx = db.transaction("runs", "readonly");
+        const runs = await new Promise((resolve) => {
+            const request = tx.objectStore("runs").getAll();
+            request.onsuccess = (e) => resolve(e.target.result);
+        });
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
+        doc.setFontSize(14); doc.setTextColor(0); doc.text(`${event.toUpperCase()}`, 14, 30);
+        
+        doc.autoTable({ 
+            startY: 40, 
+            head: [['Date', 'KM', 'Time', 'Pace', 'Route']], 
+            body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]),
+            theme: 'grid'
+        });
+        
+        doc.setFontSize(12);
+        doc.text("__________________________", 14, doc.internal.pageSize.height - 20);
+        doc.text("Chanthiran Sivaperuman", 14, doc.internal.pageSize.height - 12);
+        
+        const fileName = `${event.replace(/\s+/g, '_')}.pdf`;
+
+        if(mode === 'save') {
+            doc.save(fileName);
+        } else {
+            const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+            if(navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'Run Report' });
+            } else {
+                doc.save(fileName);
+            }
+        }
+    } catch (err) {
+        alert("PDF Error: " + err.message);
+    } finally {
+        btn.style.opacity = "1";
     }
 }
 
@@ -286,8 +320,24 @@ function openHistory() {
 
 function toggleMap() { mapState = !mapState; document.getElementById('map').style.display = mapState ? 'block' : 'none'; if(mapState) map.invalidateSize(); }
 function updateLoc() { localStorage.setItem('chan_loc', document.getElementById('locInput').value); location.reload(); }
-function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); }
-function updateProgress() { if(targetGoal > 0) { document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; document.getElementById('balKm').innerText = Math.max(targetGoal - totalAccumulated, 0).toFixed(2); } }
+function updateGoal() { 
+    localStorage.setItem('chan_target', document.getElementById('goalInput').value); 
+    localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); 
+    location.reload(); 
+}
+
+function updateProgress() { 
+    if(targetGoal > 0) { 
+        document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; 
+        document.getElementById('balKm').innerText = Math.max(targetGoal - totalAccumulated, 0).toFixed(2); 
+    }
+    if(targetDate) {
+        const diff = new Date(targetDate) - new Date();
+        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+        document.getElementById('balDays').innerText = Math.max(days, 0);
+    }
+}
+
 function calcDist(l1, o1, l2, o2) { const R = 6371; const dL = (l2-l1)*Math.PI/180; const dO = (o2-o1)*Math.PI/180; const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
 
 function updateUI() {
