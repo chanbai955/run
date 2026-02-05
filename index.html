@@ -131,11 +131,12 @@
 <script>
 let sessionDistance = 0, totalSeconds = 0, sessionSplits = [], lastCoords = null, watchID, timerInterval;
 let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer;
+let lastSpokenMilestone = 0;
 let totalAccumulated = parseFloat(localStorage.getItem('chan_total')) || 0;
 let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 
-const dbReq = indexedDB.open("ChanthiranDB", 12);
+const dbReq = indexedDB.open("ChanthiranDB", 13);
 dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
 dbReq.onsuccess = (e) => { db = e.target.result; };
 
@@ -159,6 +160,7 @@ function initMap() {
 function speak(text) {
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(text);
+    msg.rate = 0.9; // Slightly slower for clarity
     window.speechSynthesis.speak(msg);
 }
 
@@ -167,13 +169,53 @@ function resetIdleTimer() {
     if(isRunning) {
         idleTimer = setTimeout(() => {
             document.getElementById('pocketLockOverlay').style.display = 'flex';
-        }, 30000); // Auto-lock after 30 seconds
+        }, 30000);
     }
 }
 
 function unlockPocket() {
     document.getElementById('pocketLockOverlay').style.display = 'none';
     resetIdleTimer();
+}
+
+function checkMilestones() {
+    // Current milestone in 0.5 increments
+    let currentMilestone = Math.floor(sessionDistance * 2) / 2;
+
+    if (currentMilestone > lastSpokenMilestone) {
+        lastSpokenMilestone = currentMilestone;
+
+        // Custom alerts for 5km and 10km
+        if (currentMilestone === 5) {
+            speak("5 kilometers. Just run.");
+            return;
+        }
+        if (currentMilestone === 10) {
+            speak("10 kilometers. Keep moving.");
+            return;
+        }
+        
+        if (currentMilestone === 10) {
+            speak("15 kilometers. yuou can do it.");
+            return;
+        }
+        
+        if (currentMilestone === 10) {
+            speak("20 kilometers. DOn't Give Up.");
+            return;
+        }
+
+        // Full KM update (1, 2, 3...)
+        if (currentMilestone % 1 === 0) {
+            let t = document.getElementById('timer').innerText.split(':');
+            let p = document.getElementById('pace').innerText.replace('"', '').split("'");
+            speak(`${currentMilestone} kilometers. Time: ${parseInt(t[0])} minutes ${t[1]} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
+        } 
+        // Half KM update (0.5, 1.5, 2.5...)
+        else {
+            speak(`${currentMilestone} kilometers.`);
+        }
+    }
 }
 
 function toggleStart() {
@@ -208,11 +250,14 @@ function startTracking() {
             if(d > 0.005) { 
                 sessionDistance += d;
                 routeLine.addLatLng([lat, lng]);
-                let nextKm = Math.floor(sessionDistance);
-                if(nextKm > sessionSplits.length) {
-                    sessionSplits.push({ km: nextKm, time: document.getElementById('timer').innerText });
-                    speak(`${nextKm} kilometers completed.`);
+                
+                // Track splits for history
+                let currentKm = Math.floor(sessionDistance);
+                if(currentKm > sessionSplits.length) {
+                    sessionSplits.push({ km: currentKm, time: document.getElementById('timer').innerText });
                 }
+                
+                checkMilestones();
                 updateUI();
             }
         }
@@ -224,13 +269,24 @@ function stopAndSave() {
     if(!confirm("Finish and save?")) return;
     isRunning = false;
     clearTimeout(idleTimer);
-    const data = { date: new Date().toLocaleDateString('en-GB'), distance: sessionDistance.toFixed(2), duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
+    const finalDist = sessionDistance.toFixed(2);
+    const data = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
+    
     db.transaction("runs", "readwrite").objectStore("runs").add(data).onsuccess = () => {
         totalAccumulated += sessionDistance;
         localStorage.setItem('chan_total', totalAccumulated);
-        speak(`Run complete Chanthiran. Activity saved.`);
-        location.reload();
+        speak(`Run completed and saved. Final distance ${finalDist} kilometers. Well done Chan!`);
+        setTimeout(() => location.reload(), 4500);
     };
+}
+
+function resetAll() {
+    if(confirm("Start a New Season? Clears everything!")) {
+        speak("It's a new run. Run for health!");
+        localStorage.clear(); 
+        indexedDB.deleteDatabase("ChanthiranDB");
+        setTimeout(() => location.reload(), 3000);
+    }
 }
 
 async function sharePdf() {
@@ -253,7 +309,7 @@ async function sharePdf() {
 }
 
 function deleteRun(id) { if(confirm("Delete run?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => openHistory(); }
-function resetAll() { if(confirm("Start New Season? Clears everything!")) { localStorage.clear(); indexedDB.deleteDatabase("ChanthiranDB"); location.reload(); } }
+
 function openHistory() {
     document.getElementById('historyModal').style.display = 'flex';
     const list = document.getElementById('lapList'); list.innerHTML = "";
