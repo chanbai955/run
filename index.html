@@ -15,11 +15,11 @@
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
         #liveClock { font-size: 1rem; font-weight: 800; opacity: 0.8; }
-        .app-title { color: var(--neon-green); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0; letter-spacing: 1px;}
+        .app-title { color: var(--neon-green); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0; }
         
         .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
-        .main-stat { font-size: clamp(6rem, 20vw, 8.5rem); font-weight: 900; margin: 0; background: linear-gradient(180deg, #fff 30%, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; z-index: 10; }
+        .main-stat { font-size: clamp(6.5rem, 20vw, 8.5rem); font-weight: 900; margin: 0; background: linear-gradient(180deg, #fff 30%, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; z-index: 10; }
         
         .label-row { display: flex; align-items: center; gap: 10px; z-index: 10; }
         #accDisplay { font-size: 0.7rem; color: #444; font-weight: 900; }
@@ -28,10 +28,8 @@
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; text-align: center; z-index: 10; margin-top: 15px; }
         .controls-bar { background: #121212; padding: 20px 20px 100px 20px; border-radius: 40px 40px 0 0; border-top: 1px solid #222; z-index: 100; }
         
-        .progress-container { width: 90%; margin: 10px 0; }
-        .progress-bg { width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; }
+        .progress-bg { width: 90%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 10px 0;}
         .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s; }
-        .bal-row { display: flex; justify-content: space-between; width: 100%; margin-top: 8px; font-size: 0.75rem; font-weight: 800; color: var(--warning-yellow); }
 
         .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 20px; }
         .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #2c2c2e; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -83,17 +81,16 @@
 </div>
 
 <div class="controls-bar">
-    <div style="width:90%; display:flex; justify-content: space-between; font-size: 0.8rem; font-weight: 900;">
+    <div style="width:90%; display:flex; justify-content: space-between; font-size: 0.8rem; font-weight: 900; margin-bottom: 5px;">
         <span><span class="material-icons-round" style="font-size:16px; vertical-align:middle; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
-        <span id="locDisplay" onclick="document.getElementById('locModal').style.display='flex'" style="color:var(--accent-blue); cursor:pointer;">SET ROUTE</span>
+        <span>BAL: <b id="balKm">0.00</b></span>
     </div>
     
-    <div class="progress-container">
-        <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
-        <div class="bal-row">
-            <span>BAL DIST: <b id="balKm">0.00</b> KM</span>
-            <span>BAL DAYS: <b id="balDays">0</b> DAYS</span>
-        </div>
+    <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
+
+    <div style="width:90%; display:flex; justify-content: space-between; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:5px;">
+        <span onclick="document.getElementById('locModal').style.display='flex'" style="cursor:pointer;"><span class="material-icons-round" style="font-size:16px; vertical-align:middle;">place</span> <b id="locDisplay">SET ROUTE</b></span>
+        <span id="daysDisplay" style="color:var(--warning-yellow); font-weight:800;">0 DAYS LEFT</span>
     </div>
 
     <div class="button-row">
@@ -114,7 +111,7 @@
         <div style="padding:25px; display:flex; justify-content:space-between; align-items:center; position: sticky; top:0; background:#1c1c1e; z-index:100;">
             <h2 style="margin:0; color:var(--neon-green);">HISTORY</h2>
             <div style="display:flex; gap:18px;">
-                <span class="material-icons-round" id="pdfSaveIcon" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
+                <span class="material-icons-round" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
                 <span class="material-icons-round" onclick="generateAndProcessPdf('share')" style="color:var(--warning-yellow); cursor:pointer; font-size:30px;">share</span>
                 <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'" style="font-size:30px; cursor:pointer;">close</span>
             </div>
@@ -151,8 +148,13 @@ let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 let targetDate = localStorage.getItem('chan_target_date') || "";
 
-const dbReq = indexedDB.open("ChanthiranDB", 16);
-dbReq.onupgradeneeded = (e) => { e.target.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true }); };
+// Database Setup - Forced Update to Version 17
+const dbReq = indexedDB.open("ChanthiranDB", 17);
+dbReq.onupgradeneeded = (e) => {
+    let db = e.target.result;
+    if(db.objectStoreNames.contains("runs")) db.deleteObjectStore("runs");
+    db.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
+};
 dbReq.onsuccess = (e) => { db = e.target.result; };
 
 window.onload = () => {
@@ -244,27 +246,34 @@ function stopAndSave() {
     if(!confirm("Finish and save?")) return;
     isRunning = false; clearTimeout(idleTimer);
     const finalDist = sessionDistance.toFixed(2);
-    const data = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
-    db.transaction("runs", "readwrite").objectStore("runs").add(data).onsuccess = () => {
+    const runData = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
+    
+    // Improved Save Logic
+    const transaction = db.transaction(["runs"], "readwrite");
+    const store = transaction.objectStore("runs");
+    const addRequest = store.add(runData);
+
+    addRequest.onsuccess = () => {
         totalAccumulated += sessionDistance;
         localStorage.setItem('chan_total', totalAccumulated);
         speak(`Run completed and saved. Final distance ${finalDist} kilometers. Well done Chan!`);
         setTimeout(() => location.reload(), 4500);
     };
+    
+    addRequest.onerror = (err) => {
+        alert("Save failed! Please check if your storage is full.");
+        console.error(err);
+    };
 }
 
 async function generateAndProcessPdf(mode) {
-    const btn = document.getElementById('pdfSaveIcon');
-    btn.style.opacity = "0.5"; // Visual feedback
-    
-    try {
-        const event = prompt("Report Title:", "Chanthiran_Run_Report") || "Report";
-        const tx = db.transaction("runs", "readonly");
-        const runs = await new Promise((resolve) => {
-            const request = tx.objectStore("runs").getAll();
-            request.onsuccess = (e) => resolve(e.target.result);
-        });
+    const event = prompt("Report Title:", "Chanthiran_Run_Report") || "Report";
+    const tx = db.transaction("runs", "readonly");
+    const store = tx.objectStore("runs");
+    const request = store.getAll();
 
+    request.onsuccess = async () => {
+        const runs = request.result;
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         
@@ -274,8 +283,7 @@ async function generateAndProcessPdf(mode) {
         doc.autoTable({ 
             startY: 40, 
             head: [['Date', 'KM', 'Time', 'Pace', 'Route']], 
-            body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]),
-            theme: 'grid'
+            body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location])
         });
         
         doc.setFontSize(12);
@@ -283,23 +291,21 @@ async function generateAndProcessPdf(mode) {
         doc.text("Chanthiran Sivaperuman", 14, doc.internal.pageSize.height - 12);
         
         const fileName = `${event.replace(/\s+/g, '_')}.pdf`;
-
+        
         if(mode === 'save') {
             doc.save(fileName);
         } else {
-            const blob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
-            const file = new File([blob], fileName, { type: 'application/pdf' });
-            if(navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'Run Report' });
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: event, text: 'Official Run Report' });
             } else {
+                alert("Direct sharing not supported on this browser. File will be downloaded.");
                 doc.save(fileName);
             }
         }
-    } catch (err) {
-        alert("PDF Error: " + err.message);
-    } finally {
-        btn.style.opacity = "1";
-    }
+    };
 }
 
 function deleteRun(id) { if(confirm("Delete run?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => openHistory(); }
@@ -334,7 +340,7 @@ function updateProgress() {
     if(targetDate) {
         const diff = new Date(targetDate) - new Date();
         const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-        document.getElementById('balDays').innerText = Math.max(days, 0);
+        document.getElementById('daysDisplay').innerText = `${Math.max(days, 0)} DAYS LEFT`;
     }
 }
 
