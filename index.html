@@ -39,10 +39,12 @@
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: flex-end; }
         .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 90vh; overflow-y: auto; padding-bottom: 50px; }
         .history-item { padding: 15px; border-bottom: 1px solid #333; position: relative; }
-        .history-item .del-btn { position: absolute; right: 20px; top: 20px; color: var(--danger-red); }
+        .history-controls { position: absolute; right: 15px; top: 15px; display: flex; gap: 15px; }
+        .history-controls span { cursor: pointer; font-size: 22px; }
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
-        .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; }
+        .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; font-size: 1rem; }
+        .modal-card h3 { margin-top: 0; color: var(--neon-green); }
     </style>
 </head>
 <body onclick="resetIdleTimer()">
@@ -120,13 +122,14 @@
 
 <div id="manualModal" class="standard-modal">
     <div class="modal-card">
-        <h3>MANUAL ENTRY</h3>
+        <h3 id="modalTitle">MANUAL ENTRY</h3>
+        <input type="hidden" id="editId">
         <input type="number" id="manualDist" placeholder="Distance (KM)" step="0.01">
         <input type="text" id="manualTime" placeholder="MM:SS">
         <input type="text" id="manualLoc" placeholder="Route Name">
         <input type="date" id="manualDate">
-        <button onclick="saveManualEntry()" style="background:var(--neon-green); color:black; border:none; padding:12px; border-radius:10px; width:100%; font-weight:bold;">SAVE RUN</button>
-        <button onclick="document.getElementById('manualModal').style.display='none'" style="background:transparent; color:#888; border:none; margin-top:10px;">CANCEL</button>
+        <button onclick="saveManualEntry()" style="background:var(--neon-green); color:black; border:none; padding:12px; border-radius:10px; width:100%; font-weight:bold; cursor:pointer;">SAVE RUN</button>
+        <button onclick="closeManualModal()" style="background:transparent; color:#888; border:none; margin-top:10px; cursor:pointer;">CANCEL</button>
     </div>
 </div>
 
@@ -156,7 +159,7 @@ let routeName = localStorage.getItem('chan_loc') || "NOT SET";
 let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
 let targetDate = localStorage.getItem('chan_target_date') || "";
 
-const dbReq = indexedDB.open("ChanthiranDB", 26);
+const dbReq = indexedDB.open("ChanthiranDB", 28);
 dbReq.onupgradeneeded = (e) => {
     let db = e.target.result;
     if(db.objectStoreNames.contains("runs")) db.deleteObjectStore("runs");
@@ -164,7 +167,7 @@ dbReq.onupgradeneeded = (e) => {
 };
 dbReq.onsuccess = (e) => { 
     db = e.target.result; 
-    checkRecovery(); // NEW: Check for crashed sessions on load
+    checkRecovery();
 };
 
 window.onload = () => {
@@ -176,25 +179,18 @@ window.onload = () => {
     initMap();
 };
 
-// NEW: Recovery Logics
 function saveRecovery() {
-    const recovery = { dist: sessionDistance, secs: totalSeconds, splits: sessionSplits };
-    localStorage.setItem('chan_recovery', JSON.stringify(recovery));
+    localStorage.setItem('chan_recovery', JSON.stringify({ dist: sessionDistance, secs: totalSeconds, splits: sessionSplits }));
 }
 
 function checkRecovery() {
     const saved = localStorage.getItem('chan_recovery');
     if(saved) {
         const data = JSON.parse(saved);
-        if(data.dist > 0 && confirm("Unfinished run detected. Restore it?")) {
-            sessionDistance = data.dist;
-            totalSeconds = data.secs;
-            sessionSplits = data.splits;
-            updateUI();
-            toggleStart(); // Auto-resume
-        } else {
-            localStorage.removeItem('chan_recovery');
-        }
+        if(data.dist > 0 && confirm("Unfinished run detected. Restore?")) {
+            sessionDistance = data.dist; totalSeconds = data.secs; sessionSplits = data.splits;
+            updateUI(); toggleStart();
+        } else { localStorage.removeItem('chan_recovery'); }
     }
 }
 
@@ -212,14 +208,9 @@ function speak(text) {
     window.speechSynthesis.speak(msg);
 }
 
-// UPDATED: Faster Auto-Lock
 function resetIdleTimer() {
     clearTimeout(idleTimer);
-    if(isRunning) {
-        idleTimer = setTimeout(() => {
-            document.getElementById('pocketLockOverlay').style.display = 'flex';
-        }, 3000); // Changed from 30s to 3s
-    }
+    if(isRunning) idleTimer = setTimeout(() => { document.getElementById('pocketLockOverlay').style.display = 'flex'; }, 3000);
 }
 
 function unlockPocket() { document.getElementById('pocketLockOverlay').style.display = 'none'; resetIdleTimer(); }
@@ -241,41 +232,32 @@ function checkMilestones() {
 function toggleStart() {
     const icon = document.getElementById('startIcon');
     if(icon.innerText === "play_arrow") {
-        icon.innerText = "pause";
-        isRunning = true;
+        icon.innerText = "pause"; isRunning = true;
         document.getElementById('stopBtn').classList.remove('hidden');
         if(totalSeconds === 0) speak("Enjoy your run Chanthiran");
-        startTracking();
-        resetIdleTimer(); // Will lock screen in 3 seconds
+        startTracking(); resetIdleTimer();
     } else {
-        icon.innerText = "play_arrow";
-        isRunning = false;
-        speak("Run paused");
-        clearInterval(timerInterval);
-        clearTimeout(idleTimer);
-        if(watchID) navigator.geolocation.clearWatch(watchID);
+        icon.innerText = "play_arrow"; isRunning = false;
+        speak("Run paused"); clearInterval(timerInterval);
+        clearTimeout(idleTimer); if(watchID) navigator.geolocation.clearWatch(watchID);
     }
 }
 
 function startTracking() {
     timerInterval = setInterval(() => { totalSeconds++; updateUI(); }, 1000);
     watchID = navigator.geolocation.watchPosition(pos => {
-        if (!isRunning) return; 
+        if (!isRunning) return;
         const { latitude: lat, longitude: lng, accuracy } = pos.coords;
         document.getElementById('accDisplay').innerText = Math.round(accuracy) + "m";
         document.getElementById('gpsIcon').classList.toggle('sig-good', accuracy < 20);
         currentMarker.setLatLng([lat, lng]);
-
         if(accuracy < 20 && lastCoords) {
             const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
             if(d > 0.01) { 
-                sessionDistance += d;
-                routeLine.addLatLng([lat, lng]);
+                sessionDistance += d; routeLine.addLatLng([lat, lng]);
                 let currentKm = Math.floor(sessionDistance);
                 if(currentKm > sessionSplits.length) sessionSplits.push({ km: currentKm, time: document.getElementById('timer').innerText });
-                checkMilestones();
-                updateUI();
-                saveRecovery(); // NEW: Save state every 10 meters
+                checkMilestones(); updateUI(); saveRecovery();
             }
         }
         lastCoords = {lat, lng};
@@ -284,12 +266,9 @@ function startTracking() {
 
 function stopAndSave() {
     if(!confirm("Finish and save?")) return;
-    isRunning = false;
-    clearInterval(timerInterval);
+    isRunning = false; clearInterval(timerInterval);
     if(watchID) navigator.geolocation.clearWatch(watchID);
-    lastCoords = null;
-    clearTimeout(idleTimer);
-    localStorage.removeItem('chan_recovery'); // Clear recovery data on clean stop
+    lastCoords = null; clearTimeout(idleTimer); localStorage.removeItem('chan_recovery');
 
     const finalDist = sessionDistance.toFixed(2);
     const runData = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
@@ -308,47 +287,104 @@ function saveManualEntry() {
     const t = document.getElementById('manualTime').value;
     const l = document.getElementById('manualLoc').value || "Manual Log";
     const dateInput = document.getElementById('manualDate').value;
+    const editId = document.getElementById('editId').value;
     const dateStr = dateInput ? new Date(dateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
 
     if(!d || !t.includes(':')) return alert("Enter valid KM and Duration (MM:SS)");
-
     const parts = t.split(':').map(Number);
-    const secs = (parts[0]*60) + parts[1];
-    const pMin = (secs/60)/d;
+    const pMin = ((parts[0]*60)+parts[1])/60/d;
     const pace = `${Math.floor(pMin)}'${Math.floor((pMin%1)*60).toString().padStart(2,'0')}"`;
 
-    const data = { date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l + " (Manual)", splits: [] };
     const tx = db.transaction("runs", "readwrite");
-    tx.objectStore("runs").add(data).onsuccess = () => {
-        totalAccumulated += d;
-        localStorage.setItem('chan_total', totalAccumulated);
-        alert("Manual entry saved!");
-        location.reload();
+    const store = tx.objectStore("runs");
+
+    if (editId) {
+        // EDIT EXISTING
+        store.get(parseInt(editId)).onsuccess = (e) => {
+            const oldDist = parseFloat(e.target.result.distance);
+            const newData = { ...e.target.result, date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l };
+            store.put(newData).onsuccess = () => {
+                totalAccumulated = (totalAccumulated - oldDist) + d;
+                localStorage.setItem('chan_total', totalAccumulated);
+                location.reload();
+            };
+        };
+    } else {
+        // NEW MANUAL
+        store.add({ date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l + " (Manual)", splits: [] }).onsuccess = () => {
+            totalAccumulated += d; localStorage.setItem('chan_total', totalAccumulated);
+            location.reload();
+        };
+    }
+}
+
+function editRun(id) {
+    db.transaction("runs", "readonly").objectStore("runs").get(id).onsuccess = (e) => {
+        const run = e.target.result;
+        document.getElementById('modalTitle').innerText = "EDIT RUN";
+        document.getElementById('editId').value = run.id;
+        document.getElementById('manualDist').value = run.distance;
+        document.getElementById('manualTime').value = run.duration;
+        document.getElementById('manualLoc').value = run.location;
+        
+        const dateParts = run.date.split('/');
+        document.getElementById('manualDate').value = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+        
+        document.getElementById('manualModal').style.display = 'flex';
     };
 }
 
+function closeManualModal() {
+    document.getElementById('manualModal').style.display = 'none';
+    document.getElementById('editId').value = "";
+    document.getElementById('modalTitle').innerText = "MANUAL ENTRY";
+    document.getElementById('manualDist').value = "";
+    document.getElementById('manualTime').value = "";
+    document.getElementById('manualLoc').value = "";
+    document.getElementById('manualDate').value = "";
+}
+
+function deleteRun(id) {
+    if(confirm("Delete run?")) {
+        const tx = db.transaction("runs", "readwrite");
+        const store = tx.objectStore("runs");
+        store.get(id).onsuccess = (e) => {
+            const run = e.target.result;
+            if (run) {
+                const dist = parseFloat(run.distance);
+                store.delete(id).onsuccess = () => {
+                    totalAccumulated -= dist;
+                    localStorage.setItem('chan_total', totalAccumulated);
+                    renderHistory(); updateProgress();
+                    document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
+                };
+            }
+        };
+    }
+}
+
 function renderHistory() {
-    const list = document.getElementById('lapList');
-    const chart = document.getElementById('runChart');
+    const list = document.getElementById('lapList'); const chart = document.getElementById('runChart');
     list.innerHTML = ""; chart.innerHTML = "";
-    
     db.transaction("runs", "readonly").objectStore("runs").getAll().onsuccess = e => {
         const runs = e.target.result;
-        const recentRuns = runs.slice(-15);
-        const maxDist = Math.max(...recentRuns.map(r => parseFloat(r.distance))) || 1;
-
-        recentRuns.forEach(r => {
-            const bar = document.createElement('div');
-            bar.className = 'chart-bar';
+        const recentRuns = runs.slice(-15).map(r => parseFloat(r.distance));
+        const maxDist = Math.max(...recentRuns) || 1;
+        
+        runs.slice(-15).forEach(r => {
+            const bar = document.createElement('div'); bar.className = 'chart-bar';
             bar.style.height = `${(parseFloat(r.distance)/maxDist) * 100}%`;
             bar.innerHTML = `<span class="bar-label">${r.distance}</span>`;
             chart.appendChild(bar);
         });
-
+        
         runs.reverse().forEach(r => {
             const div = document.createElement('div'); div.className = "history-item";
             div.innerHTML = `<b>${r.date}</b> | ${r.distance}KM | ${r.duration}<br><small>${r.location}</small>
-            <span class="material-icons-round del-btn" onclick="deleteRun(${r.id})">delete</span>`;
+            <div class="history-controls">
+                <span class="material-icons-round" style="color:var(--warning-yellow)" onclick="editRun(${r.id})">edit</span>
+                <span class="material-icons-round" style="color:var(--danger-red)" onclick="deleteRun(${r.id})">delete</span>
+            </div>`;
             list.appendChild(div);
         });
     };
@@ -356,49 +392,23 @@ function renderHistory() {
 
 async function generateAndProcessPdf(mode) {
     const event = prompt("Report Title:", "Chanthiran_Run_Report") || "Report";
-    const tx = db.transaction("runs", "readonly");
-    tx.objectStore("runs").getAll().onsuccess = async (e) => {
-        const runs = e.target.result;
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        
+    db.transaction("runs", "readonly").objectStore("runs").getAll().onsuccess = async (e) => {
+        const runs = e.target.result; const { jsPDF } = window.jspdf; const doc = new jsPDF();
         doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
         doc.setFontSize(14); doc.setTextColor(0); doc.text(`${event.toUpperCase()}`, 14, 30);
-        
         const totalDist = runs.reduce((acc, run) => acc + parseFloat(run.distance), 0).toFixed(2);
-        doc.autoTable({
-            startY: 35,
-            head: [['Statistic', 'Value']],
-            body: [['Total Cumulative Distance', `${totalDist} KM`], ['Total Running Sessions', runs.length]],
-            theme: 'striped',
-            headStyles: { fillColor: [50, 215, 75] }
-        });
-
-        doc.autoTable({ 
-            startY: doc.lastAutoTable.finalY + 10, 
-            head: [['Date', 'KM', 'Time', 'Pace', 'Route']], 
-            body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]),
-            headStyles: { fillColor: [10, 132, 255] }
-        });
-        
+        doc.autoTable({ startY: 35, head: [['Statistic', 'Value']], body: [['Total Distance', `${totalDist} KM`], ['Sessions', runs.length]], headStyles: { fillColor: [50, 215, 75] } });
+        doc.autoTable({ startY: doc.lastAutoTable.finalY + 10, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]), headStyles: { fillColor: [10, 132, 255] } });
         const ph = doc.internal.pageSize.height;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        doc.text("Chanthiran Sivaperuman", 14, ph - 20);
-        
+        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text("Chanthiran Sivaperuman", 14, ph - 20);
         const fn = `${event.replace(/\s+/g, '_')}.pdf`;
         if(mode === 'save') { doc.save(fn); } else {
-            const pdfBlob = doc.output('blob');
-            const file = new File([pdfBlob], fn, { type: 'application/pdf' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: event });
-            } else { doc.save(fn); }
+            const blob = doc.output('blob'); const file = new File([blob], fn, { type: 'application/pdf' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: event }); } else { doc.save(fn); }
         }
     };
 }
 
-function deleteRun(id) { if(confirm("Delete run?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => { location.reload(); }; }
 function resetAll() { if(confirm("Start a New Season? Clears everything!")) { speak("It's a new run. Run for health!"); localStorage.clear(); indexedDB.deleteDatabase("ChanthiranDB"); setTimeout(() => location.reload(), 3000); } }
 function openHistory() { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); }
 function toggleMap() { mapState = !mapState; document.getElementById('map').style.display = mapState ? 'block' : 'none'; if(mapState) map.invalidateSize(); }
