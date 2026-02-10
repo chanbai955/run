@@ -10,428 +10,411 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
-        :root { --neon-green: #32D74B; --accent-blue: #0A84FF; --danger-red: #FF453A; --card-bg: #1c1c1e; --warning-yellow: #FFCC00; }
-        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        :root {
+            --neon-green: #32D74B;
+            --accent-blue: #0A84FF;
+            --danger-red: #FF453A;
+            --warning-yellow: #FFCC00;
+            --card-bg: #1c1c1e;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #000; color: #fff; margin: 0;
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
-        #liveClock { font-size: 1rem; font-weight: 800; opacity: 0.8; }
-        .app-title { color: var(--neon-green); font-size: 1.1rem; font-weight: 900; text-transform: uppercase; margin: 0; }
-        .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+        #liveClock { font-size: 1rem; margin-top: 2px; font-weight: 800; opacity: 0.8; }
+        #batteryDisplay { font-size: 0.7rem; color: var(--neon-green); font-weight: 800; }
+        
+        .title-container { flex: 1; display: flex; padding-left: 20px; align-items: center; gap: 12px; }
+        .app-title { color: var(--neon-green); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin: 0; }
+        .app-subtitle { color: #fff; font-size: 0.55rem; letter-spacing: 3px; opacity: 0.7; }
+
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        .running-pulse { animation: pulse 1.5s infinite ease-in-out; }
+
+        .main-display { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 25px; position: relative; }
         #map { position: absolute; top: 10px; bottom: 10px; left: 15px; right: 15px; border-radius: 20px; border: 1px solid #333; z-index: 5; display: none; }
-        .main-stat { font-size: clamp(6.5rem, 20vw, 8.5rem); font-weight: 900; margin: 0; background: linear-gradient(180deg, #fff 30%, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; z-index: 10; }
-        .label-row { display: flex; align-items: center; gap: 10px; z-index: 10; }
-        #accDisplay { font-size: 0.7rem; color: #444; font-weight: 900; }
+        
+        .main-stat { 
+            font-size: clamp(6.5rem, 25vw, 8.5rem); font-weight: 900; margin: 0; 
+            background: linear-gradient(180deg, #444 30%, var(--neon-green)); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+            line-height: 0.8; z-index: 10; pointer-events: none;
+        }
+
+        .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; z-index: 10; }
+        .label { font-size: 1rem; color: #666; letter-spacing: 4px; font-weight: 800; margin: 0; }
+        #gpsIcon { font-size: 24px; transition: all 0.3s ease; color: #333; }
         .sig-good { color: var(--accent-blue) !important; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; text-align: center; z-index: 10; margin-top: 15px; }
-        .controls-bar { background: #121212; padding: 20px 20px 100px 20px; border-radius: 40px 40px 0 0; border-top: 1px solid #222; z-index: 100; }
-        .progress-bg { width: 90%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 10px 0;}
-        .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s; }
-        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 20px; }
-        .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #2c2c2e; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .btn-main { width: 80px; height: 80px; background: var(--neon-green); color: #000; }
-        .stop { background: var(--danger-red) !important; color: #fff; }
-        .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; }
-        .chart-wrapper { margin: 15px 20px; padding: 15px; background: #000; border-radius: 15px; border: 1px solid #333; overflow-x: auto; }
-        .chart-container { display: flex; align-items: flex-end; gap: 8px; height: 100px; min-width: 100%; }
-        .chart-bar { flex: 1; background: var(--neon-green); border-radius: 4px 4px 0 0; min-width: 20px; position: relative; transition: height 0.3s; }
-        .bar-label { position: absolute; top: -18px; width: 100%; text-align: center; font-size: 0.6rem; font-weight: bold; color: var(--accent-blue); }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 20px; text-align: center; z-index: 10; }
+        .stat-box h2 { margin: 0; font-size: 2rem; }
+        .stat-box p { margin: 5px 0; font-size: 0.7rem; color: #888; font-weight: bold; }
+
+        .controls-bar { background: #121212; padding: 20px 20px 100px 20px; display: flex; flex-direction: column; align-items: center; border-top: 1px solid #1c1c1e; border-radius: 45px 45px 0 0; z-index: 100; }
+        .goal-container { width: 90%; margin-bottom: 5px; }
+        .progress-bg { width: 100%; height: 10px; background: #2c2c2e; border-radius: 5px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: var(--neon-green); width: 0%; transition: width 0.5s ease; }
+
+        .loc-row { width: 90%; display: flex; align-items: center; gap: 10px; margin-top: 10px; cursor: pointer; color: var(--accent-blue); }
+        .loc-row b { text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+
+        .button-row { display: flex; width: 100%; justify-content: space-around; align-items: center; margin-top: 15px; }
+        .new-run-circle { width: 55px; height: 55px; background: linear-gradient(145deg, #1b5e20, #32D74B); border: 2px solid #555; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; text-align: center; }
+        
+        .btn { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; }
+        .btn-main { width: 85px; height: 85px; }
+        .btn-side { width: 50px; height: 50px; background: #2c2c2e; color: #fff; }
+        .start { background: var(--neon-green); color: #000; }
+        .stop { background: var(--danger-red); color: #fff; }
+
         #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; align-items: flex-end; }
-        .modal-content { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 90vh; overflow-y: auto; padding-bottom: 50px; }
-        .history-item { padding: 15px; border-bottom: 1px solid #333; position: relative; }
-        .history-controls { position: absolute; right: 15px; top: 15px; display: flex; gap: 15px; }
-        .history-controls span { cursor: pointer; font-size: 22px; }
+
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: flex-end; }
+        .quick-note { background: var(--card-bg); width: 100%; border-radius: 30px 30px 0 0; max-height: 85vh; overflow-y: auto; }
+        .sticky-history-header { position: sticky; top: 0; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .chart-wrapper { margin: 15px 20px; padding: 20px 10px 35px 10px; background: #121212; border-radius: 15px; border: 1px solid #333; overflow-x: auto; white-space: nowrap; }
+        .chart-container { display: inline-flex; align-items: flex-end; gap: 15px; min-width: 100%; height: 120px; }
+        .chart-bar { flex: 0 0 45px; background: var(--neon-green); border-radius: 6px 6px 0 0; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+        .chart-bar span.bar-val { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--accent-blue); font-size: 0.6rem; font-weight: 900; margin-bottom: 8px; }
+        .chart-bar span.bar-date { position: absolute; bottom: -25px; color: #888; font-size: 0.6rem; font-weight: 800; }
+        .history-list-container { padding: 10px 25px 120px 25px; }
+        .history-item { background: #2c2c2e; margin-bottom: 12px; padding: 15px; border-radius: 15px; display: flex; flex-direction: column; border-left: 4px solid var(--accent-blue); position: relative; }
+        .history-item span.del { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--danger-red); cursor: pointer; }
+
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
-        .modal-card { background: var(--card-bg); width: 85%; padding: 25px; border-radius: 20px; text-align: center; }
-        .modal-card input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 10px; border: none; background: #333; color: #fff; font-size: 1rem; }
+        .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
+        .modal-card input { width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; font-weight: bold; }
+        .modal-card button { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; border: none; }
     </style>
 </head>
-<body onclick="resetIdleTimer()">
+<body>
 
-<div id="pocketLockOverlay" ondblclick="unlockPocket()">
-    <span class="material-icons-round" style="font-size: 5rem; color: #333;">lock</span>
-    <p style="color: #444; font-weight: 800;">DOUBLE-TAP TO UNLOCK</p>
-</div>
+    <div id="pocketLockOverlay">
+        <span class="material-icons-round" style="font-size: 6rem; color: #222;">lock</span>
+        <p style="color: #444; font-weight: 900; letter-spacing: 2px; margin-top: 20px;">DOUBLE-TAP TO UNLOCK</p>
+    </div>
 
-<div class="header">
-    <div class="header-info">
-        <span id="fullDate">--/--/----</span>
-        <span id="liveClock">00:00:00</span>
-    </div>
-    <div style="text-align: right;">
-        <div class="app-title">Chanthiran</div>
-        <div style="font-size: 0.6rem; letter-spacing: 2px; color: var(--neon-green);">RUN TRACKER</div>
-    </div>
-</div>
-
-<div class="main-display">
-    <div id="map"></div>
-    <p class="main-stat" id="distance">0.00</p>
-    <div class="label-row">
-        <span style="letter-spacing: 3px; font-weight: 800; color: #666;">KILOMETERS</span>
-        <span id="gpsIcon" class="material-icons-round">gps_fixed</span>
-        <span id="accDisplay">--m</span>
-    </div>
-    <div class="stats-grid">
-        <div><h2 id="timer" style="margin:0;">00:00</h2><p style="font-size:0.6rem; color:#888;">TIME</p></div>
-        <div><h2 id="pace" style="margin:0;">0'00"</h2><p style="font-size:0.6rem; color:#888;">PACE</p></div>
-    </div>
-</div>
-
-<div class="controls-bar">
-    <div style="width:90%; display:flex; justify-content: space-between; font-size: 0.8rem; font-weight: 900; margin-bottom: 5px;">
-        <span><span class="material-icons-round" style="font-size:16px; vertical-align:middle; color:var(--warning-yellow); cursor:pointer;" onclick="document.getElementById('goalModal').style.display='flex'">edit</span> DONE: <b id="doneKm">0.00</b></span>
-        <span>BAL: <b id="balKm">0.00</b></span>
-    </div>
-    <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
-    <div style="width:90%; display:flex; justify-content: space-between; align-items:center; color:var(--accent-blue); font-size:0.8rem; margin-top:5px;">
-        <span onclick="document.getElementById('locModal').style.display='flex'" style="cursor:pointer;"><span class="material-icons-round" style="font-size:16px; vertical-align:middle;">place</span> <b id="locDisplay">SET ROUTE</b></span>
-        <span id="daysDisplay" style="color:var(--warning-yellow); font-weight:800;">0 DAYS LEFT</span>
-    </div>
-    <div class="button-row">
-        <button class="btn" onclick="document.getElementById('pocketLockOverlay').style.display='flex'"><span class="material-icons-round">screen_lock_portrait</span></button>
-        <button class="btn" onclick="openHistory()"><span class="material-icons-round">analytics</span></button>
-        <div class="new-run-circle" onclick="resetAll()">
-            <span style="font-size: 0.6rem; color:#fff; font-weight:900;">NEW</span>
-            <span style="font-size: 0.7rem; color:#fff; font-weight:900;">RUN</span>
+    <div class="header">
+        <div class="header-info">
+            <span id="fullDate">--/--/----</span>
+            <span id="liveClock">00:00:00</span>
+            <span id="batteryDisplay">BAT: --%</span>
         </div>
-        <button id="startBtn" class="btn btn-main" onclick="toggleStart()"><span class="material-icons-round" id="startIcon" style="font-size:3rem;">play_arrow</span></button>
-        <button id="stopBtn" class="btn btn-main stop hidden" onclick="stopAndSave()"><span class="material-icons-round" style="font-size:3rem;">stop</span></button>
-        <button onclick="toggleMap()" class="btn"><span class="material-icons-round">map</span></button>
-    </div>
-</div>
-
-<div id="historyModal" class="modal">
-    <div class="modal-content">
-        <div style="padding:25px; display:flex; justify-content:space-between; align-items:center; position: sticky; top:0; background:#1c1c1e; z-index:100;">
-            <h2 style="margin:0; color:var(--neon-green);">HISTORY</h2>
-            <div style="display:flex; gap:18px;">
-                <span class="material-icons-round" onclick="document.getElementById('manualModal').style.display='flex'" style="color:var(--neon-green); cursor:pointer; font-size:30px;">add_circle</span>
-                <span class="material-icons-round" onclick="generateAndProcessPdf('save')" style="color:var(--accent-blue); cursor:pointer; font-size:30px;">picture_as_pdf</span>
-                <span class="material-icons-round" onclick="generateAndProcessPdf('share')" style="color:var(--warning-yellow); cursor:pointer; font-size:30px;">share</span>
-                <span class="material-icons-round" onclick="document.getElementById('historyModal').style.display='none'" style="font-size:30px; cursor:pointer;">close</span>
+        <div class="title-container">
+            <span id="headerRunIcon" class="material-icons-round" style="color: var(--neon-green); font-size: 2.2rem;">directions_run</span>
+            <div>
+                <div class="app-title">Chanthiran</div>
+                <div class="app-subtitle">RUN TRACKER</div>
             </div>
         </div>
-        <div class="chart-wrapper">
-            <div class="chart-container" id="runChart"></div>
+        <button id="mapLoopBtn" class="btn btn-side" style="width:40px; height:40px;"><span class="material-icons-round">map</span></button>
+    </div>
+    
+    <div class="main-display">
+        <div id="map"></div>
+        <p class="main-stat" id="distance">0.00</p>
+        <div class="label-row">
+            <p class="label">KILOMETERS</p>
+            <span id="gpsIcon" class="material-icons-round">gps_fixed</span>
         </div>
-        <div id="lapList"></div>
+        <div class="stats-grid">
+            <div class="stat-box"> <h2 id="timer">00:00</h2> <p>TIME</p> </div>
+            <div class="stat-box"> <h2 id="pace">0'00"</h2> <p>PACE</p> </div>
+        </div>
     </div>
-</div>
 
-<div id="manualModal" class="standard-modal">
-    <div class="modal-card">
-        <h3 id="modalTitle">MANUAL ENTRY</h3>
-        <input type="hidden" id="editId">
-        <input type="number" id="manualDist" placeholder="Distance (KM)" step="0.01">
-        <input type="text" id="manualTime" placeholder="HH:MM:SS">
-        <input type="text" id="manualLoc" placeholder="Route Name">
-        <input type="date" id="manualDate">
-        <button onclick="saveManualEntry()" style="background:var(--neon-green); color:black; border:none; padding:12px; border-radius:10px; width:100%; font-weight:bold; cursor:pointer;">SAVE RUN</button>
-        <button onclick="closeManualModal()" style="background:transparent; color:#888; border:none; margin-top:10px; cursor:pointer;">CANCEL</button>
-    </div>
-</div>
+    <div class="controls-bar">
+        <div class="goal-container">
+            <div style="display:flex; justify-content: space-between; font-size: 0.8rem; font-weight: 800;">
+                <div><span class="material-icons-round" id="editGoal" style="color:var(--warning-yellow); cursor:pointer; font-size: 18px;">edit</span> DONE: <b id="doneKm">0.00</b></div>
+                <span>BAL: <b id="balKm">0.00</b></span>
+            </div>
+            <div class="progress-bg"><div class="progress-fill" id="progressBar"></div></div>
+        </div>
 
-<div id="locModal" class="standard-modal">
-    <div class="modal-card">
-        <h3>ROUTE NAME</h3>
-        <input type="text" id="locInput" placeholder="Enter name">
-        <button onclick="updateLoc()" style="background:var(--accent-blue); color:white; border:none; padding:10px; border-radius:10px; width:100%;">SAVE</button>
-    </div>
-</div>
+        <div class="loc-row" id="editLoc">
+            <span class="material-icons-round">place</span>
+            <b id="locDisplay">SET ROUTE</b>
+        </div>
 
-<div id="goalModal" class="standard-modal">
-    <div class="modal-card">
-        <h3>SET GOAL</h3>
-        <input type="number" id="goalInput" placeholder="Target KM">
-        <input type="date" id="dateInput">
-        <button onclick="updateGoal()" style="background:var(--neon-green); color:black; border:none; padding:10px; border-radius:10px; width:100%;">SAVE GOAL</button>
-        <button onclick="document.getElementById('goalModal').style.display='none'" style="background:transparent; color:#888; border:none; margin-top:10px;">CANCEL</button>
+        <div class="button-row">
+            <button class="btn btn-side" id="pocketLockBtn"><span class="material-icons-round">screen_lock_portrait</span></button>
+            <button class="btn btn-side" id="openHistory"><span class="material-icons-round">analytics</span></button>
+            <div class="new-run-circle" id="newRunBtn">
+                <span style="font-size: 0.6rem; color:#fff; font-weight:900;">NEW</span>
+                <span style="font-size: 0.75rem; color:#fff; font-weight:900;">RUN</span>
+            </div>
+            <button id="startBtn" class="btn btn-main start"><span class="material-icons-round" id="startIcon" style="font-size: 3.5rem;">play_arrow</span></button>
+            <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
+        </div>
+
+        <div class="vol-container" style="margin-top: 20px;">
+            <span class="material-icons-round" style="font-size:18px;">volume_up</span>
+            <input type="range" id="volSlider" min="0" max="1" step="0.1" value="1">
+        </div>
     </div>
-</div>
+
+    <div id="historyModal" class="modal">
+        <div class="quick-note">
+            <div class="sticky-history-header">
+                <h2 style="color:var(--neon-green); margin:0;">HISTORY</h2>
+                <div style="display:flex; gap:20px; align-items:center;">
+                    <span id="exportPdf" class="material-icons-round" style="cursor:pointer; color:var(--danger-red); font-size:28px;">picture_as_pdf</span>
+                    <span id="closeHistory" class="material-icons-round" style="cursor:pointer; font-size:28px;">close</span>
+                </div>
+            </div>
+            <div class="chart-wrapper"><div class="chart-container" id="runChart"></div></div>
+            <div class="history-list-container" id="lapList"></div>
+        </div>
+    </div>
+
+    <div id="locModal" class="standard-modal">
+        <div class="modal-card">
+            <h2>ROUTE NAME</h2>
+            <input type="text" id="locInput" placeholder="Enter Location">
+            <button id="saveLoc">SAVE ROUTE</button>
+        </div>
+    </div>
+
+    <div id="goalModal" class="standard-modal">
+        <div class="modal-card">
+            <h2>TARGET GOAL</h2>
+            <input type="number" id="goalInput" placeholder="KM Target">
+            <input type="date" id="dateInput">
+            <button id="saveGoal">SET TARGET</button>
+        </div>
+    </div>
 
 <script>
-let sessionDistance = 0, totalSeconds = 0, sessionSplits = [], lastCoords = null, watchID, timerInterval;
-let db, map, routeLine, currentMarker, mapState = 0, isRunning = false, idleTimer, lastSpokenMilestone = 0;
-let totalAccumulated = parseFloat(localStorage.getItem('chan_total')) || 0;
-let routeName = localStorage.getItem('chan_loc') || "NOT SET";
-let targetGoal = parseFloat(localStorage.getItem('chan_target')) || 0;
-let targetDate = localStorage.getItem('chan_target_date') || "";
-
-const dbReq = indexedDB.open("ChanthiranDB", 29);
-dbReq.onupgradeneeded = (e) => {
-    let db = e.target.result;
-    if(db.objectStoreNames.contains("runs")) db.deleteObjectStore("runs");
-    db.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
-};
-dbReq.onsuccess = (e) => { 
-    db = e.target.result; 
-    checkRecovery();
-};
-
-window.onload = () => {
-    document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
-    document.getElementById('locDisplay').innerText = routeName;
-    document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
-    updateProgress();
-    setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
-    initMap();
-};
-
-function saveRecovery() {
-    localStorage.setItem('chan_recovery', JSON.stringify({ dist: sessionDistance, secs: totalSeconds, splits: sessionSplits }));
-}
-
-function checkRecovery() {
-    const saved = localStorage.getItem('chan_recovery');
-    if(saved) {
-        const data = JSON.parse(saved);
-        if(data.dist > 0 && confirm("Unfinished run detected. Restore?")) {
-            sessionDistance = data.dist; totalSeconds = data.secs; sessionSplits = data.splits;
-            updateUI(); toggleStart();
-        } else { localStorage.removeItem('chan_recovery'); }
-    }
-}
-
-function initMap() {
-    map = L.map('map', { zoomControl: false }).setView([3.139, 101.686], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    routeLine = L.polyline([], {color: '#32D74B', weight: 5}).addTo(map);
-    currentMarker = L.circleMarker([0, 0], {radius: 7, color: '#0A84FF', fillOpacity: 1}).addTo(map);
-}
-
-function speak(text) {
-    window.speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.rate = 0.95;
-    window.speechSynthesis.speak(msg);
-}
-
-function resetIdleTimer() {
-    clearTimeout(idleTimer);
-    if(isRunning) idleTimer = setTimeout(() => { document.getElementById('pocketLockOverlay').style.display = 'flex'; }, 3000);
-}
-
-function unlockPocket() { document.getElementById('pocketLockOverlay').style.display = 'none'; resetIdleTimer(); }
-
-function checkMilestones() {
-    let currentMilestone = Math.floor(sessionDistance * 2) / 2;
-    if (currentMilestone > lastSpokenMilestone) {
-        lastSpokenMilestone = currentMilestone;
-        if (currentMilestone === 5) { speak("5 kilometers. Just run."); return; }
-        if (currentMilestone === 10) { speak("10 kilometers. Keep moving."); return; }
-        if (currentMilestone % 1 === 0) {
-            let t = document.getElementById('timer').innerText;
-            let p = document.getElementById('pace').innerText;
-            speak(`${currentMilestone} kilometers. Time: ${t}. Pace: ${p}.`);
-        } else { speak(`${currentMilestone} kilometers.`); }
-    }
-}
-
-function toggleStart() {
-    const icon = document.getElementById('startIcon');
-    if(icon.innerText === "play_arrow") {
-        icon.innerText = "pause"; isRunning = true;
-        document.getElementById('stopBtn').classList.remove('hidden');
-        if(totalSeconds === 0) speak("Enjoy your run Chanthiran");
-        startTracking(); resetIdleTimer();
-    } else {
-        icon.innerText = "play_arrow"; isRunning = false;
-        speak("Run paused"); clearInterval(timerInterval);
-        clearTimeout(idleTimer); if(watchID) navigator.geolocation.clearWatch(watchID);
-    }
-}
-
-function startTracking() {
-    timerInterval = setInterval(() => { totalSeconds++; updateUI(); }, 1000);
-    watchID = navigator.geolocation.watchPosition(pos => {
-        if (!isRunning) return;
-        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
-        document.getElementById('accDisplay').innerText = Math.round(accuracy) + "m";
-        document.getElementById('gpsIcon').classList.toggle('sig-good', accuracy < 20);
-        currentMarker.setLatLng([lat, lng]);
-        if(accuracy < 20 && lastCoords) {
-            const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
-            if(d > 0.01) { 
-                sessionDistance += d; routeLine.addLatLng([lat, lng]);
-                let currentKm = Math.floor(sessionDistance);
-                if(currentKm > sessionSplits.length) sessionSplits.push({ km: currentKm, time: document.getElementById('timer').innerText });
-                checkMilestones(); updateUI(); saveRecovery();
-            }
-        }
-        lastCoords = {lat, lng};
-    }, null, { enableHighAccuracy: true });
-}
-
-function stopAndSave() {
-    if(!confirm("Finish and save?")) return;
-    isRunning = false; clearInterval(timerInterval);
-    if(watchID) navigator.geolocation.clearWatch(watchID);
-    lastCoords = null; clearTimeout(idleTimer); localStorage.removeItem('chan_recovery');
-
-    const finalDist = sessionDistance.toFixed(2);
-    const runData = { date: new Date().toLocaleDateString('en-GB'), distance: finalDist, duration: document.getElementById('timer').innerText, pace: document.getElementById('pace').innerText, location: routeName, splits: sessionSplits };
+    let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
+    let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
+    let targetDate = localStorage.getItem('chan_target_date') || "";
+    let runLocation = localStorage.getItem('chan_run_loc') || "NOT SET";
     
-    const tx = db.transaction("runs", "readwrite");
-    tx.objectStore("runs").add(runData).onsuccess = () => {
-        totalAccumulated += sessionDistance;
-        localStorage.setItem('chan_total', totalAccumulated);
-        speak(`Run completed and saved. Final distance ${finalDist} kilometers. Well done Chan!`);
+    let sessionDistance = 0, totalSeconds = 0, runPath = [], lastSpokenDistance = 0, lastPointTime = Date.now();
+    let watchID, timerInterval, lastCoords = null, db, map, routeLine, currentMarker, streetTiles, satelliteTiles, mapState = 2;
+    let wakeLock = null;
+
+    const dbReq = indexedDB.open("runProEliteDB", 4);
+    dbReq.onupgradeneeded = (e) => {
+        let db = e.target.result;
+        if(!db.objectStoreNames.contains("runs")) db.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
+    };
+    dbReq.onsuccess = (e) => { db = e.target.result; };
+
+    window.onload = () => {
+        initMap();
+        updateDisplay();
+        initBattery();
+        document.getElementById('fullDate').innerText = new Date().toLocaleDateString('en-GB');
+        document.getElementById('locDisplay').innerText = runLocation;
+        setInterval(() => { document.getElementById('liveClock').innerText = new Date().toTimeString().split(' ')[0]; }, 1000);
+    };
+
+    function initMap() {
+        map = L.map('map', { zoomControl: false }).setView([0, 0], 15);
+        streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        satelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{y}/{x}/{z}');
+        streetTiles.addTo(map);
+        routeLine = L.polyline([], {color: '#32D74B', weight: 6}).addTo(map);
+        currentMarker = L.circleMarker([0, 0], {radius: 8, color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 1}).addTo(map);
+    }
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.volume = document.getElementById('volSlider').value;
+        window.speechSynthesis.speak(msg);
+    }
+
+    function checkVoiceMilestones() {
+        if (sessionDistance >= lastSpokenDistance + 0.5) {
+            lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
+            const isFullKm = lastSpokenDistance % 1 === 0;
+
+            if (lastSpokenDistance === 5.0) { speak("5 kilometers. Just run."); return; }
+            if (lastSpokenDistance === 10.0) { speak("10 kilometers. Keep moving."); return; }
+            if (lastSpokenDistance === 15.0) { speak("15 kilometers. Almost there."); return; }
+            if (lastSpokenDistance === 20.0) { speak("20 kilometers. Never give up."); return; }
+
+            if (isFullKm) {
+                let t = document.getElementById('timer').innerText.split(":");
+                let p = document.getElementById('pace').innerText.replace('"', '').split("'");
+                speak(`${lastSpokenDistance} kilometers. Time: ${parseInt(t[0])} minutes ${parseInt(t[1])} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
+            } else { speak(`${lastSpokenDistance} kilometers.`); }
+        }
+    }
+
+    document.getElementById('startBtn').onclick = () => {
+        if (document.getElementById('startIcon').innerText === "pause") {
+            stopTracking();
+            speak("Paused");
+            return;
+        }
+        if (totalSeconds === 0) speak("Enjoy the run"); else speak("Run resumed");
+        startTracking();
+    };
+
+    function startTracking() {
+        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(lock => wakeLock = lock);
+        document.getElementById('startIcon').innerText = "pause";
+        document.getElementById('stopBtn').classList.remove('hidden');
+        document.getElementById('headerRunIcon').classList.add('running-pulse');
+
+        // TIMER NOW RUNS CONTINUOUSLY UNTIL STOPPED
+        timerInterval = setInterval(() => {
+            totalSeconds++;
+            updateDisplay();
+        }, 1000);
+
+        watchID = navigator.geolocation.watchPosition(pos => {
+            const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
+            currentMarker.setLatLng([lat, lng]);
+            if (mapState !== 2) map.panTo([lat, lng]);
+            
+            if (accuracy < 15) document.getElementById('gpsIcon').classList.add('sig-good');
+            else document.getElementById('gpsIcon').classList.remove('sig-good');
+
+            if (accuracy > 12) return; 
+
+            if (lastCoords) {
+                const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
+                const timeDiff = (Date.now() - lastPointTime) / 1000;
+                const calcSpeed = (d / (timeDiff / 3600));
+
+                // Only record distance if we are actually walking/running
+                // But timer (totalSeconds) is no longer inside this IF block
+                if (d > 0.007 && calcSpeed > 2.8) {
+                    sessionDistance += d;
+                    runPath.push([lat, lng]);
+                    routeLine.addLatLng([lat, lng]);
+                    updateDisplay();
+                    checkVoiceMilestones();
+                    lastPointTime = Date.now();
+                }
+            }
+            lastCoords = {lat, lng};
+        }, null, {enableHighAccuracy: true});
+    }
+
+    document.getElementById('stopBtn').onclick = () => {
+        if(!confirm("Finish and Save?")) return;
+        stopTracking();
+        const tx = db.transaction("runs", "readwrite");
+        tx.objectStore("runs").add({ 
+            date: document.getElementById('fullDate').innerText, 
+            distance: sessionDistance.toFixed(2), 
+            duration: document.getElementById('timer').innerText, 
+            pace: document.getElementById('pace').innerText,
+            location: runLocation 
+        });
+        totalDistance += sessionDistance;
+        localStorage.setItem('chan_accumulated_km', totalDistance);
+        speak(`Run Completed And Saved. ${sessionDistance.toFixed(2)} kilometers. Well Done Chanthiran`);
         setTimeout(() => location.reload(), 4500);
     };
-}
 
-function saveManualEntry() {
-    const d = parseFloat(document.getElementById('manualDist').value);
-    const t = document.getElementById('manualTime').value;
-    const l = document.getElementById('manualLoc').value || "Manual Log";
-    const dateInput = document.getElementById('manualDate').value;
-    const editId = document.getElementById('editId').value;
-    const dateStr = dateInput ? new Date(dateInput).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
+    function stopTracking() {
+        clearInterval(timerInterval);
+        if(watchID) navigator.geolocation.clearWatch(watchID);
+        if(wakeLock) { wakeLock.release(); wakeLock = null; }
+        document.getElementById('startIcon').innerText = "play_arrow";
+        document.getElementById('headerRunIcon').classList.remove('running-pulse');
+    }
 
-    if(!d || !t.includes(':')) return alert("Enter valid KM and Time (HH:MM:SS)");
+    // UI & History Logic
+    document.getElementById('mapLoopBtn').onclick = function() {
+        mapState = (mapState + 1) % 3;
+        const mapEl = document.getElementById('map');
+        this.querySelector('.material-icons-round').style.transform = `rotate(${360 * (mapState + 1)}deg)`;
+        if (mapState === 0) { mapEl.style.display = 'block'; map.removeLayer(satelliteTiles); streetTiles.addTo(map); }
+        else if (mapState === 1) { mapEl.style.display = 'block'; map.removeLayer(streetTiles); satelliteTiles.addTo(map); }
+        else { mapEl.style.display = 'none'; }
+        if (mapState !== 2) setTimeout(() => { map.invalidateSize(); if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); }, 300);
+    };
 
-    const parts = t.split(':').map(Number);
-    let totalSecs = 0;
-    if(parts.length === 3) totalSecs = (parts[0]*3600)+(parts[1]*60)+parts[2];
-    else if(parts.length === 2) totalSecs = (parts[0]*60)+parts[1];
+    document.getElementById('openHistory').onclick = () => {
+        document.getElementById('historyModal').style.display = 'flex';
+        renderHistory();
+    };
 
-    const pMin = (totalSecs/60)/d;
-    const pace = `${Math.floor(pMin)}'${Math.floor((pMin%1)*60).toString().padStart(2,'0')}"`;
-
-    const tx = db.transaction("runs", "readwrite");
-    const store = tx.objectStore("runs");
-
-    if (editId) {
-        store.get(parseInt(editId)).onsuccess = (e) => {
-            const oldDist = parseFloat(e.target.result.distance);
-            const newData = { ...e.target.result, date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l };
-            store.put(newData).onsuccess = () => {
-                totalAccumulated = (totalAccumulated - oldDist) + d;
-                localStorage.setItem('chan_total', totalAccumulated);
-                location.reload();
-            };
-        };
-    } else {
-        store.add({ date: dateStr, distance: d.toFixed(2), duration: t, pace: pace, location: l + " (Manual)", splits: [] }).onsuccess = () => {
-            totalAccumulated += d; localStorage.setItem('chan_total', totalAccumulated);
-            location.reload();
+    function renderHistory() {
+        const tx = db.transaction("runs", "readonly");
+        const req = tx.objectStore("runs").getAll();
+        req.onsuccess = () => {
+            const list = document.getElementById('lapList'), chart = document.getElementById('runChart');
+            list.innerHTML = ""; chart.innerHTML = "";
+            const runs = req.result;
+            const maxDist = Math.max(...runs.map(r => parseFloat(r.distance))) || 1;
+            runs.forEach(run => {
+                const bar = document.createElement('div'); bar.className = 'chart-bar';
+                bar.style.height = `${(parseFloat(run.distance) / maxDist) * 100}%`;
+                bar.innerHTML = `<span class="bar-val">${run.distance}</span><span class="bar-date">${run.date.substring(0,5)}</span>`;
+                chart.appendChild(bar);
+            });
+            runs.reverse().forEach(run => {
+                const row = document.createElement('div'); row.className = "history-item";
+                row.innerHTML = `<div><strong>${run.date}</strong><br>${run.distance} KM | ${run.duration}<br><small>${run.location || 'NONE'}</small></div><span class="material-icons-round del" onclick="deleteRun(${run.id})">delete</span>`;
+                list.appendChild(row);
+            });
         };
     }
-}
 
-function editRun(id) {
-    db.transaction("runs", "readonly").objectStore("runs").get(id).onsuccess = (e) => {
-        const run = e.target.result;
-        document.getElementById('modalTitle').innerText = "EDIT RUN";
-        document.getElementById('editId').value = run.id;
-        document.getElementById('manualDist').value = run.distance;
-        document.getElementById('manualTime').value = run.duration;
-        document.getElementById('manualLoc').value = run.location;
-        const dParts = run.date.split('/');
-        document.getElementById('manualDate').value = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
-        document.getElementById('manualModal').style.display = 'flex';
-    };
-}
-
-function closeManualModal() {
-    document.getElementById('manualModal').style.display = 'none';
-    document.getElementById('editId').value = "";
-    document.getElementById('manualDist').value = "";
-    document.getElementById('manualTime').value = "";
-    document.getElementById('manualLoc').value = "";
-    document.getElementById('manualDate').value = "";
-}
-
-function deleteRun(id) {
-    if(confirm("Delete run?")) {
-        const tx = db.transaction("runs", "readwrite");
-        const store = tx.objectStore("runs");
-        store.get(id).onsuccess = (e) => {
-            const run = e.target.result;
-            if (run) {
-                const d = parseFloat(run.distance);
-                store.delete(id).onsuccess = () => {
-                    totalAccumulated -= d; localStorage.setItem('chan_total', totalAccumulated);
-                    renderHistory(); updateProgress();
-                    document.getElementById('doneKm').innerText = totalAccumulated.toFixed(2);
-                };
-            }
+    document.getElementById('exportPdf').onclick = () => {
+        const tx = db.transaction("runs", "readonly");
+        const req = tx.objectStore("runs").getAll();
+        req.onsuccess = () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("CHANTHIRAN RUN REPORT", 14, 20);
+            doc.autoTable({ startY: 30, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: req.result.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]) });
+            doc.save(`Run_Report.pdf`);
         };
-    }
-}
-
-function renderHistory() {
-    const list = document.getElementById('lapList'); const chart = document.getElementById('runChart');
-    list.innerHTML = ""; chart.innerHTML = "";
-    db.transaction("runs", "readonly").objectStore("runs").getAll().onsuccess = e => {
-        const runs = e.target.result;
-        const rec = runs.slice(-15);
-        const max = Math.max(...rec.map(r => parseFloat(r.distance))) || 1;
-        rec.forEach(r => {
-            const bar = document.createElement('div'); bar.className = 'chart-bar';
-            bar.style.height = `${(parseFloat(r.distance)/max) * 100}%`;
-            bar.innerHTML = `<span class="bar-label">${r.distance}</span>`;
-            chart.appendChild(bar);
-        });
-        runs.reverse().forEach(r => {
-            const div = document.createElement('div'); div.className = "history-item";
-            div.innerHTML = `<b>${r.date}</b> | ${r.distance}KM | ${r.duration}<br><small>${r.location}</small>
-            <div class="history-controls">
-                <span class="material-icons-round" style="color:var(--warning-yellow)" onclick="editRun(${r.id})">edit</span>
-                <span class="material-icons-round" style="color:var(--danger-red)" onclick="deleteRun(${r.id})">delete</span>
-            </div>`;
-            list.appendChild(div);
-        });
     };
-}
 
-async function generateAndProcessPdf(mode) {
-    const event = prompt("Report Title:", "Chanthiran_Run_Report") || "Report";
-    db.transaction("runs", "readonly").objectStore("runs").getAll().onsuccess = async (e) => {
-        const runs = e.target.result; const { jsPDF } = window.jspdf; const doc = new jsPDF();
-        doc.setFontSize(22); doc.setTextColor(50, 215, 75); doc.text("CHANTHIRAN RUN REPORT", 14, 20);
-        doc.setFontSize(14); doc.setTextColor(0); doc.text(`${event.toUpperCase()}`, 14, 30);
-        const tot = runs.reduce((acc, run) => acc + parseFloat(run.distance), 0).toFixed(2);
-        doc.autoTable({ startY: 35, head: [['Statistic', 'Value']], body: [['Total Distance', `${tot} KM`], ['Sessions', runs.length]], headStyles: { fillColor: [50, 215, 75] } });
-        doc.autoTable({ startY: doc.lastAutoTable.finalY + 10, head: [['Date', 'KM', 'Time', 'Pace', 'Route']], body: runs.reverse().map(r => [r.date, r.distance, r.duration, r.pace, r.location]), headStyles: { fillColor: [10, 132, 255] } });
-        const ph = doc.internal.pageSize.height;
-        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text("Chanthiran Sivaperuman", 14, ph - 20);
-        const fn = `${event.replace(/\s+/g, '_')}.pdf`;
-        if(mode === 'save') { doc.save(fn); } else {
-            const blob = doc.output('blob'); const file = new File([blob], fn, { type: 'application/pdf' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: event }); } else { doc.save(fn); }
+    window.deleteRun = (id) => { if(confirm("Delete?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => renderHistory(); };
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
+    document.getElementById('saveLoc').onclick = () => { localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); location.reload(); };
+    document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
+    document.getElementById('pocketLockOverlay').ondblclick = () => document.getElementById('pocketLockOverlay').style.display = 'none';
+    document.getElementById('editGoal').onclick = () => document.getElementById('goalModal').style.display = 'flex';
+    document.getElementById('saveGoal').onclick = () => {
+        localStorage.setItem('chan_target_km', document.getElementById('goalInput').value);
+        localStorage.setItem('chan_target_date', document.getElementById('dateInput').value);
+        location.reload();
+    };
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start New fresh?")) { speak("Its a New Run ..Run For Health"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
+
+    function calcDist(lat1, lon1, lat2, lon2) {
+        const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function updateDisplay() {
+        document.getElementById('distance').innerText = sessionDistance.toFixed(2);
+        let cur = totalDistance + sessionDistance;
+        document.getElementById('doneKm').innerText = cur.toFixed(2);
+        if (targetGoal > 0) {
+            document.getElementById('balKm').innerText = Math.max(targetGoal - cur, 0).toFixed(2);
+            document.getElementById('progressBar').style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
         }
-    };
-}
+        const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0'), secs = (totalSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer').innerText = `${mins}:${secs}`;
+        if (sessionDistance > 0.01) {
+            let pMin = (totalSeconds / 60) / sessionDistance;
+            document.getElementById('pace').innerText = `${Math.floor(pMin)}'${Math.floor((pMin % 1) * 60).toString().padStart(2, '0')}"`;
+        }
+    }
 
-function resetAll() { if(confirm("Start a New Season? Clears everything!")) { speak("It's a new run. Run for health!"); localStorage.clear(); indexedDB.deleteDatabase("ChanthiranDB"); setTimeout(() => location.reload(), 3000); } }
-function openHistory() { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); }
-function toggleMap() { mapState = !mapState; document.getElementById('map').style.display = mapState ? 'block' : 'none'; if(mapState) map.invalidateSize(); }
-function updateLoc() { localStorage.setItem('chan_loc', document.getElementById('locInput').value); location.reload(); }
-function updateGoal() { localStorage.setItem('chan_target', document.getElementById('goalInput').value); localStorage.setItem('chan_target_date', document.getElementById('dateInput').value); location.reload(); }
-function updateProgress() { 
-    if(targetGoal > 0) { 
-        document.getElementById('progressBar').style.width = Math.min((totalAccumulated/targetGoal)*100, 100) + "%"; 
-        document.getElementById('balKm').innerText = Math.max(targetGoal - totalAccumulated, 0).toFixed(2); 
-    }
-    if(targetDate) {
-        const diff = new Date(targetDate) - new Date();
-        document.getElementById('daysDisplay').innerText = `${Math.max(Math.ceil(diff/(1000*60*60*24)), 0)} DAYS LEFT`;
-    }
-}
-function calcDist(l1, o1, l2, o2) { const R = 6371; const dL = (l2-l1)*Math.PI/180; const dO = (o2-o1)*Math.PI/180; const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2; return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
-function updateUI() {
-    document.getElementById('distance').innerText = sessionDistance.toFixed(2);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    document.getElementById('timer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
-    if(sessionDistance > 0.01) {
-        let pMin = (totalSeconds/60)/sessionDistance;
-        document.getElementById('pace').innerText = `${Math.floor(pMin)}'${Math.floor((pMin%1)*60).toString().padStart(2,'0')}"`;
-    }
-}
+    function initBattery() { if (navigator.getBattery) navigator.getBattery().then(b => { const u = () => document.getElementById('batteryDisplay').innerText = `BAT: ${Math.round(b.level*100)}%`; u(); b.onlevelchange = u; }); }
 </script>
 </body>
 </html>
