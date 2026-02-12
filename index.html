@@ -24,6 +24,13 @@
             display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
 
+        /* Smoothing the Map Path */
+        path.leaflet-interactive {
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 3px var(--neon-green));
+        }
+
         .header { padding: 25px 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; }
         .header-info { display: flex; flex-direction: column; }
         #fullDate { font-size: 0.9rem; font-weight: 900; }
@@ -50,7 +57,6 @@
         .label-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; z-index: 10; }
         .label { font-size: 1rem; color: #666; letter-spacing: 4px; font-weight: 800; margin: 0; }
         #gpsIcon { font-size: 24px; transition: all 0.3s ease; color: #333; }
-        .sig-good { color: var(--accent-blue) !important; }
 
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 20px; text-align: center; z-index: 10; }
         .stat-box h2 { margin: 0; font-size: 2rem; }
@@ -72,6 +78,7 @@
         .btn-side { width: 50px; height: 50px; background: #2c2c2e; color: #fff; }
         .start { background: var(--neon-green); color: #000; }
         .stop { background: var(--danger-red); color: #fff; }
+        .hidden { display: none; }
 
         #pocketLockOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
 
@@ -89,7 +96,7 @@
 
         .standard-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2100; display: none; justify-content: center; align-items: center; }
         .modal-card { background: var(--card-bg); width: 85%; padding: 30px; border-radius: 25px; text-align: center; }
-        .modal-card input { width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; font-weight: bold; }
+        .modal-card input { width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; font-weight: bold; background: #333; color: #fff; }
         .modal-card button { width: 100%; padding: 15px; background: var(--neon-green); border-radius: 15px; font-weight: 800; border: none; }
     </style>
 </head>
@@ -154,7 +161,7 @@
             <button id="stopBtn" class="btn btn-main stop hidden"><span class="material-icons-round" style="font-size: 3.5rem;">stop</span></button>
         </div>
 
-        <div class="vol-container" style="margin-top: 20px;">
+        <div class="vol-container" style="margin-top: 20px; display: flex; align-items: center; gap: 10px;">
             <span class="material-icons-round" style="font-size:18px;">volume_up</span>
             <input type="range" id="volSlider" min="0" max="1" step="0.1" value="1">
         </div>
@@ -192,6 +199,7 @@
     </div>
 
 <script>
+    // --- APP STATE ---
     let totalDistance = parseFloat(localStorage.getItem('chan_accumulated_km')) || 0;
     let targetGoal = parseFloat(localStorage.getItem('chan_target_km')) || 0;
     let targetDate = localStorage.getItem('chan_target_date') || "";
@@ -200,6 +208,11 @@
     let sessionDistance = 0, totalSeconds = 0, runPath = [], lastSpokenDistance = 0, lastPointTime = Date.now();
     let watchID, timerInterval, lastCoords = null, db, map, routeLine, currentMarker, streetTiles, satelliteTiles, mapState = 2;
     let wakeLock = null;
+
+    // --- GEOLOCATION TUNING (STRAVA-LIKE) ---
+    const MIN_ACCURACY = 25; // Don't record points with >25m error
+    const MIN_SPEED = 0.6;   // Meters per second (approx 2km/h) to filter drift
+    const MIN_MOVE_DIST = 0.004; // 4 meters minimum movement to count a new point
 
     const dbReq = indexedDB.open("runProEliteDB", 4);
     dbReq.onupgradeneeded = (e) => {
@@ -222,7 +235,7 @@
         streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
         satelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{y}/{x}/{z}');
         streetTiles.addTo(map);
-        routeLine = L.polyline([], {color: '#32D74B', weight: 6}).addTo(map);
+        routeLine = L.polyline([], {color: '#32D74B', weight: 6, opacity: 0.9, lineJoin: 'round'}).addTo(map);
         currentMarker = L.circleMarker([0, 0], {radius: 8, color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 1}).addTo(map);
     }
 
@@ -237,17 +250,13 @@
         if (sessionDistance >= lastSpokenDistance + 0.5) {
             lastSpokenDistance = Math.floor(sessionDistance * 2) / 2;
             const isFullKm = lastSpokenDistance % 1 === 0;
-
-            if (lastSpokenDistance === 5.0) { speak("5 kilometers. Just run."); return; }
-            if (lastSpokenDistance === 10.0) { speak("10 kilometers. Keep moving."); return; }
-            if (lastSpokenDistance === 15.0) { speak("15 kilometers. Almost there."); return; }
-            if (lastSpokenDistance === 20.0) { speak("20 kilometers. Never give up."); return; }
-
             if (isFullKm) {
                 let t = document.getElementById('timer').innerText.split(":");
                 let p = document.getElementById('pace').innerText.replace('"', '').split("'");
-                speak(`${lastSpokenDistance} kilometers. Time: ${parseInt(t[0])} minutes ${parseInt(t[1])} seconds. Pace: ${p[0]} minutes ${p[1]} seconds.`);
-            } else { speak(`${lastSpokenDistance} kilometers.`); }
+                speak(`${lastSpokenDistance} kilometers. Time: ${parseInt(t[0])} minutes. Pace: ${p[0]} ${p[1]}`);
+            } else {
+                speak(`${lastSpokenDistance} kilometers.`);
+            }
         }
     }
 
@@ -257,7 +266,7 @@
             speak("Paused");
             return;
         }
-        if (totalSeconds === 0) speak("Enjoy the run"); else speak("Run resumed");
+        speak(totalSeconds === 0 ? "Enjoy the run" : "Run resumed");
         startTracking();
     };
 
@@ -267,7 +276,6 @@
         document.getElementById('stopBtn').classList.remove('hidden');
         document.getElementById('headerRunIcon').classList.add('running-pulse');
 
-        // TIMER NOW RUNS CONTINUOUSLY UNTIL STOPPED
         timerInterval = setInterval(() => {
             totalSeconds++;
             updateDisplay();
@@ -275,22 +283,29 @@
 
         watchID = navigator.geolocation.watchPosition(pos => {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
+            
+            // Update GPS Icon Color based on signal quality
+            const gpsIcon = document.getElementById('gpsIcon');
+            if (accuracy <= 10) gpsIcon.style.color = "var(--neon-green)";
+            else if (accuracy <= MIN_ACCURACY) gpsIcon.style.color = "var(--warning-yellow)";
+            else gpsIcon.style.color = "var(--danger-red)";
+
             currentMarker.setLatLng([lat, lng]);
             if (mapState !== 2) map.panTo([lat, lng]);
-            
-            if (accuracy < 15) document.getElementById('gpsIcon').classList.add('sig-good');
-            else document.getElementById('gpsIcon').classList.remove('sig-good');
 
-            if (accuracy > 12) return; 
+            // STRAVA-LIKE FILTERING
+            if (accuracy > MIN_ACCURACY) return; // Skip poor data
 
             if (lastCoords) {
                 const d = calcDist(lastCoords.lat, lastCoords.lng, lat, lng);
                 const timeDiff = (Date.now() - lastPointTime) / 1000;
-                const calcSpeed = (d / (timeDiff / 3600));
+                const calcSpeedMs = d * 1000 / timeDiff; // Speed in meters/sec
+                
+                // Use device reported speed or calculated speed
+                const activeSpeed = speed !== null ? speed : calcSpeedMs;
 
-                // Only record distance if we are actually walking/running
-                // But timer (totalSeconds) is no longer inside this IF block
-                if (d > 0.007 && calcSpeed > 2.8) {
+                // Only add distance if moving at a realistic pace and distance is significant
+                if (d > MIN_MOVE_DIST && activeSpeed > MIN_SPEED) {
                     sessionDistance += d;
                     runPath.push([lat, lng]);
                     routeLine.addLatLng([lat, lng]);
@@ -300,7 +315,7 @@
                 }
             }
             lastCoords = {lat, lng};
-        }, null, {enableHighAccuracy: true});
+        }, err => console.error(err), {enableHighAccuracy: true, maximumAge: 0});
     }
 
     document.getElementById('stopBtn').onclick = () => {
@@ -316,7 +331,7 @@
         });
         totalDistance += sessionDistance;
         localStorage.setItem('chan_accumulated_km', totalDistance);
-        speak(`Run Completed And Saved. ${sessionDistance.toFixed(2)} kilometers. Well Done Chanthiran`);
+        speak(`Run Completed. ${sessionDistance.toFixed(2)} kilometers. Well Done Chanthiran`);
         setTimeout(() => location.reload(), 4500);
     };
 
@@ -328,22 +343,44 @@
         document.getElementById('headerRunIcon').classList.remove('running-pulse');
     }
 
-    // UI & History Logic
+    function calcDist(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function updateDisplay() {
+        document.getElementById('distance').innerText = sessionDistance.toFixed(2);
+        let cur = totalDistance + sessionDistance;
+        document.getElementById('doneKm').innerText = cur.toFixed(2);
+        if (targetGoal > 0) {
+            document.getElementById('balKm').innerText = Math.max(targetGoal - cur, 0).toFixed(2);
+            document.getElementById('progressBar').style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
+        }
+        const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const secs = (totalSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer').innerText = `${mins}:${secs}`;
+        if (sessionDistance > 0.02) {
+            let pMin = (totalSeconds / 60) / sessionDistance;
+            document.getElementById('pace').innerText = `${Math.floor(pMin)}'${Math.floor((pMin % 1) * 60).toString().padStart(2, '0')}"`;
+        }
+    }
+
+    // --- UI CONTROLS ---
     document.getElementById('mapLoopBtn').onclick = function() {
         mapState = (mapState + 1) % 3;
         const mapEl = document.getElementById('map');
-        this.querySelector('.material-icons-round').style.transform = `rotate(${360 * (mapState + 1)}deg)`;
         if (mapState === 0) { mapEl.style.display = 'block'; map.removeLayer(satelliteTiles); streetTiles.addTo(map); }
         else if (mapState === 1) { mapEl.style.display = 'block'; map.removeLayer(streetTiles); satelliteTiles.addTo(map); }
         else { mapEl.style.display = 'none'; }
         if (mapState !== 2) setTimeout(() => { map.invalidateSize(); if(runPath.length > 0) map.fitBounds(routeLine.getBounds()); }, 300);
     };
 
-    document.getElementById('openHistory').onclick = () => {
-        document.getElementById('historyModal').style.display = 'flex';
-        renderHistory();
-    };
-
+    document.getElementById('openHistory').onclick = () => { document.getElementById('historyModal').style.display = 'flex'; renderHistory(); };
+    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
+    
     function renderHistory() {
         const tx = db.transaction("runs", "readonly");
         const req = tx.objectStore("runs").getAll();
@@ -379,7 +416,6 @@
     };
 
     window.deleteRun = (id) => { if(confirm("Delete?")) db.transaction("runs", "readwrite").objectStore("runs").delete(id).onsuccess = () => renderHistory(); };
-    document.getElementById('closeHistory').onclick = () => document.getElementById('historyModal').style.display = 'none';
     document.getElementById('editLoc').onclick = () => document.getElementById('locModal').style.display = 'flex';
     document.getElementById('saveLoc').onclick = () => { localStorage.setItem('chan_run_loc', document.getElementById('locInput').value); location.reload(); };
     document.getElementById('pocketLockBtn').onclick = () => document.getElementById('pocketLockOverlay').style.display = 'flex';
@@ -390,29 +426,7 @@
         localStorage.setItem('chan_target_date', document.getElementById('dateInput').value);
         location.reload();
     };
-    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start New fresh?")) { speak("Its a New Run ..Run For Health"); localStorage.clear(); setTimeout(() => location.reload(), 5000); } };
-
-    function calcDist(lat1, lon1, lat2, lon2) {
-        const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    }
-
-    function updateDisplay() {
-        document.getElementById('distance').innerText = sessionDistance.toFixed(2);
-        let cur = totalDistance + sessionDistance;
-        document.getElementById('doneKm').innerText = cur.toFixed(2);
-        if (targetGoal > 0) {
-            document.getElementById('balKm').innerText = Math.max(targetGoal - cur, 0).toFixed(2);
-            document.getElementById('progressBar').style.width = Math.min((cur / targetGoal) * 100, 100) + "%";
-        }
-        const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0'), secs = (totalSeconds % 60).toString().padStart(2, '0');
-        document.getElementById('timer').innerText = `${mins}:${secs}`;
-        if (sessionDistance > 0.01) {
-            let pMin = (totalSeconds / 60) / sessionDistance;
-            document.getElementById('pace').innerText = `${Math.floor(pMin)}'${Math.floor((pMin % 1) * 60).toString().padStart(2, '0')}"`;
-        }
-    }
+    document.getElementById('newRunBtn').onclick = () => { if(confirm("Start fresh? This clears ALL data.")) { localStorage.clear(); location.reload(); } };
 
     function initBattery() { if (navigator.getBattery) navigator.getBattery().then(b => { const u = () => document.getElementById('batteryDisplay').innerText = `BAT: ${Math.round(b.level*100)}%`; u(); b.onlevelchange = u; }); }
 </script>
